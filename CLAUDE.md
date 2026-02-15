@@ -74,6 +74,11 @@ Example:
 - One concern per PR — don't mix refactoring with features
 -->
 
+## Issue Management (do not remove)
+
+- Close issues after fully resolving the request (comment with answer, or open a PR with "Closes #N" in the description).
+- If you cannot fully resolve an issue, leave it open and comment explaining what's blocked.
+
 ## Output Style (do not remove)
 
 - Be thorough in analysis but concise in output. Prefer bullet points over paragraphs.
