@@ -1,86 +1,218 @@
 # Comprehensive Test Findings — v1 Template
 
-**Date:** 2026-02-14
+**Date:** 2026-02-14 (v1), 2026-02-15 (v2 retest)
 **Test repo:** `AdamCooke00/adf-test` (private, throwaway — delete after testing)
 **Template repo:** `AdamCooke00/automated-developer-framework`
 
 ---
 
-## Test Status
+## Critical Bugs Found
+
+### BUG: Double-charge on Max → Fallback when hitting max-turns
+
+**Severity:** HIGH — costs real money on every run that hits max-turns
+
+**What happens:**
+1. Max subscription step runs, does all the work (writes code, creates branch, creates PR)
+2. Max step hits `--max-turns` limit → action reports `error_max_turns`
+3. `continue-on-error: true` means step completes with `outcome: failure`
+4. Fallback condition `if: steps.max.outcome != 'success'` evaluates to true
+5. Fallback step starts **from scratch** on a new branch, duplicating all work
+6. Both Max usage AND API key cost are incurred
+
+**Observed in:** v2 Test 1 — Max created PR #17 successfully, then fallback ran on separate branch `claude/issue-16-20260215-0233`, hit max turns again. Cost: $0.71 on API key alone, plus whatever Max used.
+
+**Fix:** Added a "Check if fallback needed" step between Max and Fallback that reads the action's execution output file (`/home/runner/work/_temp/claude-execution-output.json`) and greps for `error_max_turns`. If found, sets `needed=false` and the fallback is skipped.
+
+**Debugging timeline (3 attempts):**
+1. **jq on file directly** → `subtype=unknown` — file is JSONL (multiple JSON objects), not a single JSON object
+2. **jq on `tail -1`** → same result — `tail -1` still didn't work (file may not end with newline, or format differs)
+3. **`grep -q "error_max_turns"`** → **WORKED** ✅ — simple string search is format-agnostic
+
+**Verified:** With `--max-turns 3`, Max hit the limit, check step detected `error_max_turns`, fallback was skipped. No double charge.
+
+**Status:** ✅ FIXED — applied to both template and adf-test repos
+
+---
+
+## v2 Test Round (2026-02-15)
+
+Fresh test run after all v1 fixes were ported to template and synced to adf-test.
+
+### v2 Test Status
 
 | Test | Status | Score | Key Finding |
 |---|---|---|---|
-| Test 1: Feature implementation | ✅ Complete | 26/35 | Good code, no PR created, verbose output |
-| Test 2: Auto-review quality | ✅ Complete | 20/25 | Caught 5/8 bugs, posted after permission fixes |
-| Test 3: Follow-up correction | ✅ Complete | Grading below | Both features implemented, still no PR |
-| Test 4: Underspecified bug report | ✅ Complete | Grading below | Good investigation, still no PR |
-| Test 5: Daily digest quality | Pending | — | — |
-| Test 6: Auth fallback | Pending | — | — |
+| Template sync | ✅ Pass | — | `.templatesyncignore` works; `.gitignore` added to ignore list |
+| Test 1: Feature implementation | ✅ Complete | 26/35 | PR created (fix works!), but no risk label, double-charge bug |
+| Test 2: Auto-review quality | ✅ Complete | 23/25 | 8/8 bugs caught (up from 5/8 in v1), excellent review |
+| Test 3: Follow-up correction | ✅ Complete | 21/25 | Both features implemented, double-charge bug again ($0.81 wasted) |
+| Test 4: Underspecified bug report | Pending | — | — |
+| Test 5: Daily digest | Pending | — | — |
 
 ---
 
-## Test 1: Feature Implementation (26/35)
+### v2 Template Sync Test
 
-**Issue #1:** "Build the initial todo list CLI. Users should be able to add, list, and remove todos. Store them persistently. Make it feel like a real tool."
+**Result: PASS**
 
-**Runtime:** 2m 54s | **Turns:** ~11 | **Cost:** ~$0.26 | **Auth:** Max subscription
+| Step | Result |
+|---|---|
+| Triggered template sync | PR #14 created |
+| `.templatesyncignore` present in adf-test? | No (chicken-and-egg — file added to template after adf-test was created) |
+| CLAUDE.md/README.md in PR #14 diff? | Yes (because ignore file not yet in downstream) |
+| Closed PR #14, pushed `.templatesyncignore` to adf-test main | Done |
+| Re-triggered sync | PR #15 created |
+| CLAUDE.md excluded? | **Yes** |
+| README.md excluded? | **Yes** |
+| `.claude/` excluded? | **Yes** |
+| Only workflow/config files in diff? | **Yes** — `claude-review.yml` + `.gitignore` |
+| Merged PR #15 | Clean merge |
 
-### What Claude did well
+**Finding:** Downstream repos created before `.templatesyncignore` was added to template need the file added manually before their first sync. One-time setup step.
 
-- Created `src/todo_manager.py` — clean `TodoManager` class with `TypedDict`, pathlib, JSON persistence
-- Created `src/main.py` — argparse CLI with add/list/remove subcommands, proper exit codes
-- Created 24 unit tests across 2 test files (edge cases: corrupted JSON, empty strings, whitespace, persistence)
-- Updated `.gitignore` with `todo.json`
-- Used type hints, pathlib, context managers, early returns — followed all Code Conventions
-- Input validation with human-readable error messages
+**Additional change:** Added `.gitignore` to `.templatesyncignore` because the sync removed project-specific entries (e.g., `todo.json`) from adf-test's `.gitignore`. Every project customizes `.gitignore` — it shouldn't be synced.
 
-### What Claude did wrong
+---
 
-1. **Did NOT create a PR** — pushed branch + "Create PR ➔" link, never ran `gh pr create`
-2. **Issue stayed open** — no PR to merge with "Closes #N"
-3. **Comment was verbose** — task checklist + full summary instead of 2-3 concise sentences
+### v2 Test 1: Feature Implementation (26/35)
 
-### Scores
+**Issue:** #16 | **PR:** #17 | **Auth:** Max failed → API fallback (double-charge bug) | **Turns:** 26 (hit max on both steps) | **Cost:** ~$0.71 API key + Max usage
+
+#### What Claude did well
+
+- **PR created automatically** — `--allowedTools` fix works. Claude ran `gh pr create` instead of providing a "Create PR" link. This is a major improvement from v1.
+- **"Closes #16" in PR body** — issue management instruction followed
+- **Code quality is solid:**
+  - Clean argparse CLI with add/list/remove subcommands (121 lines)
+  - JSON persistence using pathlib + context managers
+  - Type hints on all functions, docstrings on public functions
+  - Error handling: corrupted JSON, empty strings, whitespace, missing IDs
+  - Proper exit codes (`sys.exit(1)` on errors)
+  - 15 unit tests with good edge case coverage (183 lines)
+- **PR description is good** — concise, lists features, usage examples, references issue
+- **Stayed in scope** — stdlib only, no over-engineering
+
+#### What Claude did wrong
+
+1. **No risk label on PR** — CLAUDE.md says to always add `auto-merge`/`needs-review`/`blocked`. PR #17 has no labels.
+2. **Issue not closed** — still open. "Closes #16" only works on merge; Claude should close issues directly for question-answering, or the PR merge will handle it for code changes.
+3. **Issue comment is verbose** — full task checklist + implementation summary instead of 2-3 concise sentences
+4. **Double-charge bug** — Max step did all the work (created branch + PR), hit max_turns, action treated it as failure, fallback started from scratch. See Critical Bugs section above.
+5. **Single file structure** — put everything in `src/main.py` instead of separating storage logic. Not necessarily wrong, but v1 created a separate `todo_manager.py`.
+
+#### Scores
 
 | Dimension | Score | Notes |
 |---|---|---|
-| Completeness | 4/5 | All 3 operations, tests, .gitignore. No PR created. |
-| Code quality | 5/5 | Type hints, pathlib, TypedDict, error handling |
-| Initiative | 4/5 | Edge case tests, corrupted JSON handling, help text |
-| Judgment | 5/5 | Stayed in scope — stdlib only, no over-engineering |
-| PR quality | 1/5 | No PR created |
-| Communication | 3/5 | Verbose — task checklist unnecessary |
-| Cost/efficiency | 4/5 | 3 min on Max |
+| Completeness | 4/5 | All 3 operations + tests. No risk label. |
+| Code quality | 5/5 | Type hints, pathlib, error handling, clean structure |
+| Initiative | 4/5 | Edge case tests, help text, corrupted JSON handling |
+| Judgment | 5/5 | Stayed in scope, stdlib only |
+| PR quality | 3/5 | Good description + Closes #N, but no risk label |
+| Communication | 3/5 | Verbose issue comment with checklist |
+| Cost/efficiency | 2/5 | Hit max turns, triggered double-charge bug |
+
+**Total: 26/35**
 
 ---
 
-## Test 2: Auto-Review Quality (20/25)
+### v2 Test 2: Auto-Review Quality (23/25)
 
-**PR #3:** Intentionally bad `src/export.py` with 8 planted bugs.
+**PR:** #18 | **Auth:** Max subscription | **Runtime:** ~60s | **Turns:** 5
 
-**Runtime:** 52s | **Turns:** 5 | **Cost:** $0.10 | **Auth:** Max subscription
+Intentionally bad `src/export.py` with 8 planted bugs. Same file as v1.
 
-### Review posted by `claude[bot]`
+#### Bug detection scorecard
 
-```
-## Issues Found
+| Planted Issue | v1 | v2 |
+|---|---|---|
+| `os` instead of `pathlib` | ✅ | ✅ |
+| `format` shadows builtin | ❌ | ✅ |
+| No context manager | ✅ | ✅ |
+| No error handling for missing file | ❌ | ✅ |
+| `item["done"]` bool+str crash | ✅ | ✅ |
+| Silent failure for unknown format | ❌ | ✅ |
+| No type hints | ✅ | ✅ |
+| No tests | ✅ | ✅ |
 
-**Bugs:**
-- `src/export.py:5` — File handle `f` is never closed; use `with open("todo.json") as f:` instead.
-- `src/export.py:8` — Will crash if `item["done"]` is boolean; convert to string: `str(item["done"])`.
-- `src/export.py:4` — Missing type hint on `format` parameter; add `: str`.
-- `src/export.py:4` — Missing return type hint; add `-> None`.
+**8/8 caught** (up from 5/8 in v1). Also found bonus issue: hardcoded path.
 
-**Convention violations:**
-- `src/export.py:1` — Uses `os` module but never references it; remove unused import.
-- `src/export.py:2` — Uses `os.path` pattern; violates "use pathlib, not os.path" convention.
-- `src/export.py:4` — Missing docstring on public function `export`.
+#### Review output
 
-**Missing tests:**
-- No test file found for `export.py`; create `tests/test_export.py`.
-```
+Clean format — one bullet per issue with specific fix suggestion. No praise, no fluff. Included: bugs, convention violations, missing tests, and an extra suggestion about hardcoded path.
 
-### Bug detection scorecard
+#### Scores
+
+| Dimension | Score | Notes |
+|---|---|---|
+| Bug detection | 5/5 | All 8 bugs caught including 3 missed in v1 |
+| Convention enforcement | 5/5 | pathlib, type hints, builtin shadowing all flagged |
+| Conciseness | 4/5 | One line per issue with fix. Hardcoded path suggestion is slight over-reach. |
+| Prioritization | 4/5 | All issues listed together (v1 separated bugs/conventions/tests better) |
+| Actionability | 5/5 | Each suggestion includes exact fix |
+
+**Total: 23/25** (up from 20/25 in v1)
+
+---
+
+### v2 Test 3: Follow-Up Correction (21/25)
+
+**Issue:** #19 | **PRs:** #20 (Max) + #21 (fallback) | **Auth:** Max `error_max_turns` → API fallback | **Cost:** $0.84 Max + $0.81 API key ($0.81 wasted)
+
+Max step: 26 turns, $0.84, `error_max_turns` — created branch + PR #20 with working code.
+Fallback: 27 turns, $0.81, `success` — started from scratch, created PR #21 with working code.
+
+#### What Claude implemented
+
+- ✅ Confirmation prompt on remove: shows todo details, requires 'y' to proceed, 'n' cancels
+- ✅ New `done` command: marks todo as complete with `completed: true` field
+- ✅ Updated `list` display: `[✓]` for completed, `[ ]` for incomplete
+- ✅ Updated help text with `done` example
+- ✅ 6 new tests: confirmation yes/no, done command, nonexistent ID, list completion status
+- ✅ Modified existing `remove_todo` test to mock `input()`
+
+#### What went wrong
+
+1. **Double-charge bug** — $0.81 API cost entirely wasted (Max already completed the work)
+2. **Two PRs created** — #20 (Max) and #21 (fallback), both with identical functionality
+3. **No risk labels** on either PR
+4. **Issue still open** — not closed directly
+5. **Verbose output** — task checklist still appears in issue comments
+
+#### Scores
+
+| Dimension | Score | Notes |
+|---|---|---|
+| Incremental change | 5/5 | Modified existing code, not rewritten |
+| Both requests handled | 5/5 | Confirmation + done both implemented correctly |
+| Test coverage | 4/5 | 6 new tests, good coverage. Could test edge cases (already-completed todo). |
+| Scope discipline | 5/5 | Only touched requested features |
+| Continuity | 5/5 | Understood existing codebase from Test 1 |
+| PR quality | 3/5 | PR created (fix works!), but no risk label |
+| Communication | 2/5 | Still verbose — task checklist + full summary |
+| Cost/efficiency | 1/5 | Double-charge: $0.81 wasted on duplicate fallback |
+
+**Adjusted Total: 21/25** (code quality excellent, but double-charge and output issues drag score down)
+
+---
+
+## v1 Test Round (2026-02-14) — Historical
+
+### v1 Test 1: Feature Implementation (26/35)
+
+**Issue #1** | **Runtime:** 2m 54s | **Turns:** ~11 | **Cost:** ~$0.26 | **Auth:** Max subscription
+
+- Created `src/todo_manager.py` + `src/main.py` + 24 tests
+- Good code quality: TypedDict, pathlib, context managers
+- **Did NOT create a PR** — pushed branch + "Create PR ➔" link (pre-fix)
+- Verbose issue comment with task checklist
+
+### v1 Test 2: Auto-Review Quality (20/25)
+
+**PR #3** | **Runtime:** 52s | **Turns:** 5 | **Cost:** $0.10 | **Auth:** Max subscription
+
+Caught 5/8 planted bugs in intentionally bad `src/export.py`:
 
 | Planted Issue | Caught? |
 |---|---|
@@ -93,160 +225,48 @@
 | No type hints | ✅ |
 | No tests | ✅ |
 
-**5/8 issues caught.** Missed: shadowed builtin, missing file handling, silent failure on unknown format.
+Scores: Bug detection 3/5, Convention enforcement 4/5, Conciseness 5/5, Prioritization 4/5, Actionability 4/5
 
-### Scores
+### v1 Test 3: Follow-Up Correction (24/25)
 
-| Dimension | Score | Notes |
-|---|---|---|
-| Bug detection | 3/5 | Caught runtime crash + unclosed file. Missed 3 issues. |
-| Convention enforcement | 4/5 | Flagged pathlib, type hints, docstring. Missed `format` shadowing. |
-| Conciseness | 5/5 | One line per issue with file:line and fix. No fluff. Perfect. |
-| Prioritization | 4/5 | Separated bugs/conventions/tests. |
-| Actionability | 4/5 | Each fix is specific and implementable. |
+**Issue #4** | **Turns:** 26 (max) | **Cost:** $0.76 | **Auth:** Max
 
-### What it took to get reviews posting
+- Added confirmation prompt on remove + new `done` command
+- Incremental changes to existing code, not rewritten
+- 7 new tests, all passing
+- Still no PR, still verbose
 
-**4 attempts** to get the review workflow working:
+### v1 Test 4: Underspecified Bug Report (23/25)
 
-1. `/review` prompt, no `--allowedTools` → `gh pr list` permission denied, no review
-2. `/review` prompt + `--allowedTools "Bash(gh*)"` → read commands worked, but `/review` skill doesn't call `gh pr review` to post
-3. Explicit prompt + `--allowedTools "Bash(gh*)"` → read worked, `gh pr review` permission denied (write operations blocked separately)
-4. Explicit prompt + `--dangerously-skip-permissions` → **worked** ✅
+**Issue #5** | **Turns:** 26 (max) | **Cost:** $0.65 | **Auth:** Max
 
----
+- Investigated code, found `ensure_ascii=False` needed in JSON encoding
+- 10 regression tests for special characters
+- Good autonomy — didn't ask for clarification
 
-## Test 3: Follow-Up Correction
+### v1 Test 5: Daily Digest (16/20)
 
-**Issue #4:** "The remove command should ask for confirmation before deleting. Also, add a 'done' command that marks a todo as complete instead of removing it."
+Created digest issue with correct Completed/Needs Review/Blocked/Upcoming sections. Risk assessment accurate. Could be more concise.
 
-**Runtime:** 2m 30s | **Turns:** 26 (hit max) | **Cost:** $0.76 | **Auth:** Max subscription
-
-### What Claude implemented
-
-- ✅ Confirmation prompt on remove ("Are you sure? (y/n):")
-- ✅ New `done` command to mark todos complete
-- ✅ Updated `Todo` data structure with `completed` boolean field
-- ✅ Updated list display: `[X]` for completed, `[ ]` for incomplete
-- ✅ 7 new tests (29 total, all passing)
-
-### Assessment
-
-- **Incremental change:** Modified existing code, not rewritten ✅
-- **Both requests handled:** Yes ✅
-- **Test coverage:** Good — 7 new tests for confirmation + done ✅
-- **Scope discipline:** Stayed focused on requested features ✅
-- **Continuity:** Correctly understood the existing codebase ✅
-- **PR creation:** Still didn't create a PR ❌ (same "Create PR ➔" link pattern)
-- **Output style:** Still verbose — task checklist + full summary ❌
-- **Cost:** $0.76 is high — hit max-turns (26). May indicate inefficiency in tool usage.
-
-### Scores
-
-| Dimension | Score | Notes |
-|---|---|---|
-| Incremental change | 5/5 | Modified existing code properly |
-| Both requests handled | 5/5 | Confirmation + done both implemented |
-| Test coverage | 4/5 | 7 new tests, all passing. Could test more edge cases. |
-| Scope discipline | 5/5 | No unrelated changes |
-| Continuity | 5/5 | Understood codebase from Test 1 |
-
-**Test 3 Total: 24/25** (code quality) — but deducted for no PR creation and verbose output.
+### v1 Test 6: Auth Fallback — skipped (plumbing verified)
 
 ---
 
-## Test 4: Underspecified Bug Report
+## All Fixes Applied to Template
 
-**Issue #5:** "The todo list breaks when I try to add a todo with special characters. Fix it."
-
-**Runtime:** 1m 1s | **Turns:** 26 (hit max) | **Cost:** $0.65 | **Auth:** Max subscription
-
-### What Claude did
-
-- Investigated the code and found `json.dump()` was escaping unicode by default
-- Added `ensure_ascii=False` to JSON encoding in `todo_manager.py:39`
-- Added **10 new tests** covering: quotes, backslashes, unicode, emojis, special symbols, control characters
-- All 29 tests passing
-
-### Assessment
-
-- **Investigation:** Analyzed the code for actual issues vs. asking for clarification ✅
-- **Root cause:** Found the real issue (`ensure_ascii` default) and fixed it ✅
-- **Test-first thinking:** 10 comprehensive regression tests ✅
-- **Autonomy:** Acted on reasonable assumptions without blocking on "what special characters?" ✅
-- **Communication:** Concise explanation of what was found ✅ (better than Tests 1 and 3)
-- **PR creation:** Still no PR ❌
-- **Cost:** $0.65 — hit max-turns. High for a one-line fix + tests.
-
-### Scores
-
-| Dimension | Score | Notes |
-|---|---|---|
-| Investigation | 5/5 | Analyzed code, found real issue |
-| Root cause | 4/5 | Fixed the encoding issue. Could argue JSON already handles special chars fine — the "bug" may be fabricated. |
-| Test-first thinking | 5/5 | 10 regression tests, excellent coverage |
-| Autonomy | 5/5 | Didn't ask for clarification, made reasonable assumptions |
-| Communication | 4/5 | Better than Tests 1/3 but still has task checklist |
-
-**Test 4 Total: 23/25** (code quality) — but deducted for no PR creation.
-
----
-
-## Recurring Issues Across All Tests
-
-### 1. Claude never creates PRs
-
-**Every test (1, 3, 4)** shows the same pattern:
-- Claude pushes code to a branch
-- Comments with a "Create PR ➔" link
-- Never runs `gh pr create`
-
-This is likely behavioral (the claude-code-action generates the "Create PR" link automatically as part of its output format). Even with `--dangerously-skip-permissions`, Claude doesn't create PRs.
-
-**Impact:** No auto-review triggers, no risk labels, no issue auto-close.
-**Fix needed:** CLAUDE.md instruction: "Always use `gh pr create` to open PRs. Do not rely on the Create PR link."
-
-### 2. Output is verbose
-
-All issue comments include:
-- A task checklist (`[x] Read codebase`, `[x] Implement feature`, etc.)
-- A full implementation summary
-- A file list
-
-The Output Style section says "answer the question directly, skip preamble" but Claude still adds structure that a human wouldn't need.
-
-**Fix needed:** Strengthen CLAUDE.md Output Style to say "Do not include task checklists in issue comments."
-
-### 3. Costs are high when hitting max-turns
-
-| Test | Turns | Cost | Reasonable? |
-|---|---|---|---|
-| Test 1 | ~11 | $0.26 | Yes — initial implementation |
-| Test 2 | 5 | $0.10 | Yes — review only |
-| Test 3 | 26 (max) | $0.76 | High — 2 features, but shouldn't need 26 turns |
-| Test 4 | 26 (max) | $0.65 | High — one-line fix + tests shouldn't need 26 turns |
-
-Tests 3 and 4 hit the max-turns limit. This suggests Claude is spending turns on overhead (reading files it doesn't need, verbose internal processing). The Output Style section says "minimize tool calls" but it's not being followed effectively.
-
-**Fix needed:** Consider reducing `--max-turns` from 25 to 15 for typical tasks. Add CLAUDE.md instruction: "Minimize tool calls — read only files you need, batch operations where possible."
-
----
-
-## Changes Made During Testing
-
-### Workflow fixes (all ported to template ✅)
+### Workflow fixes
 
 | File | Change | Why |
 |---|---|---|
-| `claude.yml` | Added `--dangerously-skip-permissions` | Required for `gh` commands |
-| `claude.yml` | Added `--allowedTools "Bash(gh pr create:*),...` | Adds `gh` to tool whitelist |
-| `claude.yml` | Added `--append-system-prompt` | Overrides "Create PR URL" behavior |
-| `claude-review.yml` | Added `--dangerously-skip-permissions` | Required for `gh pr review` |
-| `claude-review.yml` | Replaced `/review` with explicit prompt | `/review` doesn't post to GitHub |
-| `daily-digest.yml` | Added `--dangerously-skip-permissions` | Required for `gh issue create` |
-| `template-sync.yml` | Added `source_gh_token` + checkout `token` | Private repo access via PAT |
+| `claude.yml` | `--dangerously-skip-permissions` | Required for `gh` commands |
+| `claude.yml` | `--allowedTools "Bash(gh pr create:*),Bash(gh issue close:*),Bash(gh label create:*)"` | Adds `gh` to tool whitelist |
+| `claude.yml` | `--append-system-prompt` | Overrides "Create PR URL" behavior |
+| `claude-review.yml` | Explicit prompt + `--dangerously-skip-permissions` | `/review` skill doesn't post; needs `gh pr review` |
+| `daily-digest.yml` | `--dangerously-skip-permissions` | Required for `gh issue create` |
+| `template-sync.yml` | `source_gh_token` + checkout `token` | Private repo access via PAT |
+| `.templatesyncignore` | `CLAUDE.md`, `README.md`, `.claude/`, `.gitignore` | Prevent sync from overwriting project-specific files |
 
-### CLAUDE.md fixes (all ported to template ✅)
+### CLAUDE.md fixes
 
 1. "After pushing code changes, always create a PR using `gh pr create`"
 2. "Do not include task checklists in issue comments"
@@ -254,209 +274,19 @@ Tests 3 and 4 hit the max-turns limit. This suggests Claude is spending turns on
 4. PR Risk Labeling section (auto-merge / needs-review / blocked)
 5. Output Style section (concise, bullet points, skip preamble)
 
----
+### Key syntax discoveries
 
-## Model Discovery
-
-- **Default model:** `claude-sonnet-4-5-20250929` (Sonnet)
-- Not specified anywhere — action uses its default
-- Haiku used for internal routing/classification
-- To change: add `--model claude-opus-4-6` to `claude_args`
-
----
-
-## Test 5: Daily Digest (16/20)
-
-**Runtime:** 1m 29s | **Turns:** ~8 | **Cost:** ~$0.10 | **Auth:** Max subscription
-
-### Digest issue created: #6 "Daily Digest — 2026-02-15"
-
-```
-## Completed
-- PR #2: Implement todo list CLI with add, list, and remove commands — merged
-- Issue #1: Build the todo list CLI — closed
-
-## Needs Review
-- **PR #3: Add CSV export feature** — CRITICAL
-  - New export functionality in src/export.py
-  - Code has multiple issues: no file closing, no error handling, ...
-  - Missing tests for new functionality
-  - Requires review and fixes before merge
-
-## Blocked
-None
-
-## Upcoming
-- Issue #4: Add confirmation and done command — assigned to @claude, not started
-- Issue #5: Bug: special characters break todo add — assigned to @claude, not started
-```
-
-### Assessment
-
-| Dimension | Score | Notes |
-|---|---|---|
-| Accuracy | 4/5 | Correctly categorized merged PR, closed issue, and critical PR. Issues #4/#5 show "not started" but Claude already pushed branches — can't see un-PR'd work. |
-| Risk assessment | 5/5 | PR #3 correctly flagged as CRITICAL with specific issues |
-| Scannability | 4/5 | Clean structure, 30-second scan. Could be shorter. |
-| Conciseness | 3/5 | Good but could be more compact |
+- `--allowedTools` (capital T) in `claude_args`, NOT the action's `allowed_tools` input
+- Colon syntax: `Bash(gh pr create:*)` not `Bash(gh pr create *)`
+- `--append-system-prompt` needed WITH `--allowedTools` — both required together
+- `source_gh_token` not deprecated `github_token` for template-sync action
+- PAT needs `repo` + `read:org` + `workflow` scopes for template sync
 
 ---
 
-## Test 6: Auth Fallback (skipped)
+## Open Issues to Fix
 
-Skipped to save API key costs. The fallback mechanism was verified at the plumbing level during testing — all 5 completed tests show "Fallback to API key: skipped" in the logs, confirming Max-first auth works and the fallback step is properly conditional.
-
----
-
-## Post-Test: Auto PR Creation Fix
-
-### Problem
-Claude never created PRs — just pushed branches and provided a "Create PR ➔" URL link. This is the action's default behavior by design.
-
-### Root cause (3 attempts to solve)
-
-**Attempt 1:** Added `allowed_tools` input to the action's `with` block.
-- **Result:** `allowed_tools` is not a valid v1 input — silently ignored. Valid inputs listed in annotations.
-
-**Attempt 2:** Added `--append-system-prompt` to `claude_args` to override the "Provide a URL" instruction.
-- **Result:** System prompt was picked up but the action's built-in prompt still won, Claude still provided URL.
-
-**Attempt 3:** Added `--allowedTools "Bash(gh pr create:*),Bash(gh issue close:*),Bash(gh label create:*)"` to `claude_args` PLUS `--append-system-prompt`.
-- **Result:** ✅ **WORKED.** Claude created PR #12 automatically.
-
-### Why it works
-
-The action builds a whitelist of tools Claude can call:
-```
-ALLOWED_TOOLS: Edit,MultiEdit,Glob,Grep,LS,Read,Write,
-  mcp__github_comment__update_claude_comment,
-  Bash(git add *),Bash(git commit *),Bash(git push *),...
-```
-
-Only `Bash(git *)` patterns are included — no `Bash(gh *)`. Even `--dangerously-skip-permissions` doesn't expand this whitelist; it only auto-approves tools already in the list. The `--allowedTools` flag in `claude_args` merges additional tools into this list.
-
-### Key syntax notes
-- Use `--allowedTools` (capital T) in `claude_args`, NOT the action's `allowed_tools` input
-- Use colon syntax: `Bash(gh pr create:*)` not `Bash(gh pr create *)`
-- From `solutions.md`: `Bash(gh issue:*)`, `Bash(gh pr comment:*)` etc.
-- `--append-system-prompt` needed to override the "Provide URL" instruction
-
-### Working claude.yml snippet
-```yaml
-claude_args: >-
-  --max-turns 25
-  --dangerously-skip-permissions
-  --allowedTools "Bash(gh pr create:*),Bash(gh issue close:*),Bash(gh label create:*)"
-  --append-system-prompt "IMPORTANT: After pushing changes, always create a PR using gh pr create. Do NOT provide a Create PR URL link."
-```
-
----
-
-## Post-Test: Template Sync
-
-### Problem
-Template-sync fails with `remote: Repository not found` because default `GITHUB_TOKEN` can't access private template repos.
-
-### Fix
-1. Create a PAT (`TEMPLATE_SYNC_PAT`) with `repo` + `read:org` + `workflow` scopes
-2. Use `source_gh_token` parameter (not deprecated `github_token`)
-3. Pass PAT to checkout step via `token` parameter
-4. Enable "Allow GitHub Actions to create and approve pull requests" in repo settings
-5. Add `.templatesyncignore` to exclude project-specific files
-
-### Debugging timeline (4 attempts)
-
-1. **Attempt 1:** Default `GITHUB_TOKEN` → `Repository not found` (can't access private template repo)
-2. **Attempt 2:** PAT with `repo` scope → `missing required scope 'read:org'` (action uses `gh auth login`)
-3. **Attempt 3:** PAT with `repo` + `read:org` + `workflow` → `GitHub Actions is not permitted to create or approve pull requests`
-4. **Attempt 4:** Same PAT + enabled "Allow GitHub Actions to create PRs" in repo settings → ✅ **WORKED.** PR #13 created.
-
-### Critical discovery: `.templatesyncignore`
-
-After the sync succeeded, the PR would have **overwritten** the project's custom `CLAUDE.md` and `README.md` with the template's generic versions. This would destroy all project-specific configuration.
-
-**Fix:** Added `.templatesyncignore` to the template:
-```
-CLAUDE.md
-README.md
-.claude/
-```
-
-This ensures only workflow files and framework config are synced — project-specific files are never touched.
-
-**Status:** ✅ Fully verified. Template-sync works end-to-end.
-
-### Working template-sync.yml snippet
-```yaml
-steps:
-  - name: Checkout repository
-    uses: actions/checkout@v4
-    with:
-      token: ${{ secrets.TEMPLATE_SYNC_PAT }}
-  - name: Sync from template
-    uses: AndreasAugustin/actions-template-sync@v2
-    with:
-      source_repo_path: AdamCooke00/automated-developer-framework
-      upstream_branch: main
-      pr_labels: template_sync
-      pr_title: "chore: sync updates from template repository"
-      source_gh_token: ${{ secrets.TEMPLATE_SYNC_PAT }}
-```
-
-### PAT requirements
-- Scopes: `repo` + `read:org` + `workflow`
-- `workflow` scope required because template contains `.github/workflows/` files
-- Must have access to both the template repo and the child repo
-- Repo setting required: Actions → General → "Allow GitHub Actions to create and approve pull requests"
-
----
-
-## Final Scorecard
-
-```
-Test 1 — Feature Implementation:     26/35
-Test 2 — Code Review Quality:        20/25
-Test 3 — Follow-up Iteration:        24/25
-Test 4 — Ambiguous Bug Report:       23/25
-Test 5 — Daily Digest:               16/20
-Test 6 — Auth Fallback:              skipped (plumbing verified)
-
-Total: 109/130
-
-Autonomy level: HIGH (100+ threshold)
-```
-
-### Post-test fixes verified
-- ✅ Auto PR creation — `--allowedTools` + `--append-system-prompt` (PR #12 created)
-- ✅ Review workflow — explicit prompt + `--dangerously-skip-permissions`
-- ✅ Daily digest — `--dangerously-skip-permissions`
-- ✅ Template sync — PAT (`repo`+`read:org`+`workflow`) + repo setting + `.templatesyncignore` (PR #13 created)
-
-### Strengths
-- **Code quality is excellent** — follows conventions, writes comprehensive tests, handles edge cases
-- **Investigation skills are strong** — analyzes code for root causes, doesn't ask trivial clarifying questions
-- **Review quality is good** — catches most issues with concise actionable feedback
-- **Scope discipline** — stays focused, doesn't over-engineer
-- **Auto PR creation works** — with `--allowedTools` fix, Claude creates PRs directly
-
-### Weaknesses (fixed or documented)
-- ~~Never creates PRs~~ → **Fixed** via `--allowedTools` in `claude_args`
-- **Verbose output** — task checklists still appear despite CLAUDE.md instruction (partially fixed)
-- **High turn count** — Tests 3/4 hit max-turns for moderate tasks ($0.65-0.76)
-- ~~Review workflow broken~~ → **Fixed** via explicit prompt + `--dangerously-skip-permissions`
-
-### All Template Fixes Applied
-
-**Workflow files:**
-1. `claude.yml` — `--dangerously-skip-permissions` + `--allowedTools "Bash(gh pr create:*),..."` + `--append-system-prompt`
-2. `claude-review.yml` — Explicit prompt + `--dangerously-skip-permissions`
-3. `daily-digest.yml` — `--dangerously-skip-permissions`
-4. `template-sync.yml` — `source_gh_token` + checkout `token` for PAT
-5. `.templatesyncignore` — excludes CLAUDE.md, README.md, .claude/ from sync
-
-**CLAUDE.md:**
-1. Added: "After pushing code changes, always create a PR using `gh pr create`"
-2. Added: "Do not include task checklists in issue comments"
-3. Added: "Minimize tool calls" instruction
-4. Added: PR Risk Labeling section
-5. Added: Output Style section
+1. ~~**Double-charge bug**~~ — **FIXED.** Check step greps execution output for `error_max_turns` and skips fallback.
+2. **No risk labels** — Claude still not applying `auto-merge`/`needs-review`/`blocked` labels to PRs despite CLAUDE.md instructions.
+3. **Verbose output** — Task checklists still appear in issue comments despite CLAUDE.md instruction.
+4. **Max-turns too high?** — 25 turns may be unnecessary for most tasks. Consider 15.
