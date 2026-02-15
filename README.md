@@ -6,6 +6,7 @@ A GitHub template repository pre-configured with Claude Code automation. Clone i
 
 - **`@claude` on issues and PRs** — mention `@claude` in any issue or PR comment, and Claude reads the repo, implements the request, and pushes commits or opens a PR
 - **Automatic code review** — every PR is reviewed by Claude when opened or updated, with inline comments and a summary
+- **CI Doctor** — when any CI workflow fails, Claude automatically diagnoses the failure and posts a comment on the PR with what failed, why, and suggested fixes
 - **Daily digest** — every morning, Claude creates a summary issue with what was completed, what needs your review (with risk assessment), and what's blocked. One push notification per project on your phone.
 - **PR risk labeling** — Claude labels every PR it creates as `auto-merge`, `needs-review`, or `blocked` so you can triage across multiple projects
 - **Template sync** — when this template is updated, downstream repos automatically receive a PR with the changes
@@ -20,6 +21,7 @@ A GitHub template repository pre-configured with Claude Code automation. Clone i
 | **PR comments** | Comment `@claude fix X` on Claude's PR | Pushes new commits to the PR branch |
 | **PR review** | Submit review with `@claude` in body | Addresses review feedback, pushes fixes |
 | **Your own PRs** | Just open a PR | Claude auto-reviews with inline comments |
+| **CI failures** | (nothing — automatic) | Posts diagnostic comment on PR: what failed, why, suggested fix |
 | **Daily digest** | Read the daily-digest issue (mobile notification) | Created automatically — summarizes activity, flags what needs you |
 | **Actions tab** | Check workflow runs for cost, turn count, errors | Logs show every step Claude took |
 
@@ -269,6 +271,7 @@ Edit the `claude_args` line in each workflow file (update both the Max and fallb
 |---|---|---|
 | `.github/workflows/claude.yml` | `--max-turns 25` | How many steps Claude takes on `@claude` requests |
 | `.github/workflows/claude-review.yml` | `--max-turns 5` | How many steps Claude takes during review |
+| `.github/workflows/ci-doctor.yml` | `--max-turns 10` | How many steps Claude takes diagnosing CI failures |
 | `.github/workflows/daily-digest.yml` | `--max-turns 10` | How many steps Claude takes generating the digest |
 
 Lower = cheaper and faster. Higher = Claude can handle more complex tasks.
@@ -295,7 +298,6 @@ Then use `/ai` instead of `@claude` in comments.
 
 ## What This Template Does NOT Do (v1)
 
-- **CI failure auto-fix** — Claude does not automatically respond to failed CI runs
 - **Auto-update CLAUDE.md** — use the manual `@claude update CLAUDE.md` pattern described above
 - **Cross-repo digest** — each project gets its own daily digest; there's no single summary across all projects
 
@@ -307,6 +309,7 @@ These can all be added later as separate workflow files.
 .github/workflows/
   claude.yml            Reactive workflow — responds to @claude mentions
   claude-review.yml     Auto-review — reviews every PR on open/push
+  ci-doctor.yml         CI failure diagnosis — automatic diagnostic comments on failed workflows
   daily-digest.yml      Daily summary of activity and PRs needing review
   template-sync.yml     Monthly sync from template repo (opens PRs with updates)
 CLAUDE.md               Project memory — fill this in for your project
