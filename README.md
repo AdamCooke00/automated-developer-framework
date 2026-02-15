@@ -88,31 +88,19 @@ Go to your GitHub repo → **Settings** → **Secrets and variables** → **Acti
 |---|---|---|
 | `CLAUDE_CODE_OAUTH_TOKEN` | Run `claude setup-token` in your terminal | Recommended (uses your Max subscription) |
 | `ANTHROPIC_API_KEY` | From the workspace you created in Step 2 | Recommended (fallback when Max is rate-limited) |
-| `PAT_TOKEN` | GitHub PAT (classic) with `repo` and `workflow` scopes | Required if Claude needs to create or modify workflow files |
-| `TEMPLATE_SYNC_PAT` | GitHub PAT with `repo`, `read:org`, `workflow` scopes (see Step 5) | Required if template repo is private |
+| `PAT_TOKEN` | GitHub PAT (classic) with `repo`, `read:org`, and `workflow` scopes | Required for workflow file changes and template sync |
 
 You need **at least one** of the first two. Both is ideal — see [How Auth Works](#how-auth-works) below.
 
-**Why `PAT_TOKEN`?** GitHub's default `GITHUB_TOKEN` cannot create or modify files in `.github/workflows/`. If you ask Claude to create new workflow files via issues, it needs a PAT with the `workflow` scope. To create one: go to https://github.com/settings/tokens → **Generate new token (classic)** → select **`repo`** and **`workflow`** scopes → add it as a secret: `gh secret set PAT_TOKEN -R <your-repo>`.
+**Why `PAT_TOKEN`?** GitHub's default `GITHUB_TOKEN` cannot create or modify files in `.github/workflows/`. The `PAT_TOKEN` is used by both the Claude workflow (to push branches) and the template sync workflow (to read from the template repo and open PRs). To create one: go to https://github.com/settings/tokens → **Generate new token (classic)** → select **`repo`**, **`read:org`**, and **`workflow`** scopes → add it as a secret: `gh secret set PAT_TOKEN -R <your-repo>`.
 
 ### Step 5: Configure template sync
 
 Open `.github/workflows/template-sync.yml` and replace `<owner>/automated-developer-framework` with the actual GitHub path to your template repo (e.g., `myusername/automated-developer-framework`).
 
-**If your template repo is private**, the sync workflow needs a Personal Access Token to read from it:
-
-1. Go to https://github.com/settings/tokens → **Generate new token (classic)**
-2. Name: `TEMPLATE_SYNC_PAT`, Expiration: your choice, Scopes: **`repo`**, **`read:org`**, **`workflow`**
-3. Add it as a secret: `gh secret set TEMPLATE_SYNC_PAT -R <your-repo>`
-
-**Why these scopes:**
-- `repo` — read the private template repository
-- `read:org` — required by the sync action's `gh auth login`
-- `workflow` — push changes to `.github/workflows/` files
+The template sync workflow uses the same `PAT_TOKEN` secret as the Claude workflow — no additional secrets needed.
 
 **Required repo setting:** Go to your repo → **Settings** → **Actions** → **General** → scroll to "Workflow permissions" → check **"Allow GitHub Actions to create and approve pull requests"** → Save. Without this, the sync can push the branch but can't open the PR.
-
-If your template repo is public, this step is unnecessary — the default `GITHUB_TOKEN` can read public repos.
 
 If you don't want automatic sync, delete this workflow file.
 
