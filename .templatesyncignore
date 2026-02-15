@@ -1,4 +1,16 @@
 CLAUDE.md
 README.md
-.claude/
 .gitignore
+
+# Repo-specific .claude/ files (exclude from sync)
+.claude/rules/
+.claude/prompt-tracking/patterns.json
+.claude/prompt-tracking/prompt-log.jsonl
+.claude/settings.local.json
+
+# Framework files that SHOULD sync (not listed = will sync):
+# .claude/settings.json
+# .claude/skills/analyze-patterns/
+# .claude/skills/promote-pattern/
+# .claude/prompt-tracking/log-prompt.sh
+# .claude/prompt-tracking/.gitignore
