@@ -40,6 +40,7 @@ jobs:
         continue-on-error: true
         uses: anthropics/claude-code-action@v1
         with:
+          allowed_bots: "claude"
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             Use `gh pr diff ${{ github.event.pull_request.number }} --patch` to count total lines changed.
@@ -66,6 +67,7 @@ jobs:
         if: steps.check_label.outputs.skip == 'false' && steps.max.outcome != 'success' && steps.check_fallback.outputs.needed != 'false'
         uses: anthropics/claude-code-action@v1
         with:
+          allowed_bots: "claude"
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |
             Use `gh pr diff ${{ github.event.pull_request.number }} --patch` to count total lines changed.
