@@ -15,7 +15,7 @@ A GitHub template repository pre-configured with Claude Code automation. Clone i
 
 | Where | What you do | What Claude does |
 |---|---|---|
-| **GitHub Issues** | Create issue with `@claude` + task description | Reads issue, implements, opens PR, closes issue |
+| **GitHub Issues** | Create issue with `@claude` + task description | Reads issue, implements, opens PR (issue closes when PR merges) |
 | **Issue comments** | Reply with `@claude` + follow-up or correction | Continues work on same issue, adjusts approach |
 | **PR comments** | Comment `@claude fix X` on Claude's PR | Pushes new commits to the PR branch |
 | **PR review** | Submit review with `@claude` in body | Addresses review feedback, pushes fixes |
@@ -139,17 +139,20 @@ Request comes in (@claude mention or PR opened)
   ├─ CLAUDE_CODE_OAUTH_TOKEN is set?
   │   ├─ Yes → Try Max subscription
   │   │        ├─ Success → Done (no API cost)
-  │   │        └─ Failed (rate-limited/expired) → Fall back to API key
+  │   │        ├─ Hit turn limit → Done (work was completed, no fallback)
+  │   │        └─ Auth failed (rate-limited/expired) → Fall back to API key
   │   └─ No → Skip straight to API key
   │
   └─ ANTHROPIC_API_KEY handles the request (pay-per-token)
 ```
 
+**Double-charge protection:** If the Max step completes work but hits the turn limit, the fallback is automatically skipped. This prevents paying for the same work twice. The fallback only triggers on genuine auth failures.
+
 **Why this order:** Your Max subscription is already paid for. Using it first means automation runs at no additional cost until you hit the 5-hour rolling usage limit. The API key catches overflow.
 
 **Configuration options:**
 - **Both secrets set (recommended):** Max handles most runs for free; API key covers rate-limited periods
-- **Only `CLAUDE_CODE_OAUTH_TOKEN`:** Free automation, but workflows fail if Max is rate-limited
+- **Only `CLAUDE_CODE_OAUTH_TOKEN`:** Free automation, but workflows fail if Max is rate-limited or token expires
 - **Only `ANTHROPIC_API_KEY`:** Every run costs money, but no rate-limit interruptions
 
 **OAuth token refresh:** Tokens from `claude setup-token` can expire. If you notice the Max step consistently failing, re-run `claude setup-token` and update the secret. The `/install-github-app` flow handles refresh more reliably.
@@ -236,6 +239,7 @@ GitHub templates are a one-time copy — your project doesn't automatically get 
 - Compares your repo against the template
 - Opens a PR with any new changes, labeled `template_sync`
 - You review and merge (or close) the PR
+- Project-specific files (`CLAUDE.md`, `README.md`, `.gitignore`, `.claude/`) are excluded via `.templatesyncignore`
 
 **Trigger manually:**
 Go to **Actions** > **Template Sync** > **Run workflow** to check for updates now.
@@ -303,6 +307,7 @@ These can all be added later as separate workflow files.
   daily-digest.yml      Daily summary of activity and PRs needing review
   template-sync.yml     Monthly sync from template repo (opens PRs with updates)
 CLAUDE.md               Project memory — fill this in for your project
+.templatesyncignore     Files excluded from template sync (project-specific files)
 .gitignore              Language-agnostic defaults
 README.md               This file
 ```
