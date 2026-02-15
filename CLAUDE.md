@@ -78,7 +78,7 @@ Example:
 
 - Close issues after fully resolving the request (comment with answer, or open a PR with "Closes #N" in the description).
 - If you cannot fully resolve an issue, leave it open and comment explaining what's blocked.
-- After pushing code changes, always create a PR using the `mcp__github__create_pull_request` tool with a title, body, and "Closes #N" in the body. Do not skip this step.
+- After pushing code changes, always create a PR using `gh pr create` with a title, body, and "Closes #N" in the body. Do not skip this step.
 
 ## Output Style (do not remove)
 
