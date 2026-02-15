@@ -179,19 +179,13 @@ If there was no activity, no issue is created.
 
 **Change the schedule:** Edit the cron in `daily-digest.yml`. Use [crontab.guru](https://crontab.guru) to set your preferred time.
 
-### Auto-merge setup (optional)
+### Auto-merge setup
 
-Claude labels every PR it creates with a risk level (configured in CLAUDE.md). To let low-risk PRs merge automatically:
+Claude labels every PR it creates with a risk level (`auto-merge`, `needs-review`, or `blocked`). The `auto-merge.yml` workflow automatically merges PRs labeled `auto-merge` after the Claude Code Review passes. No branch protection rules or GitHub Pro required.
 
-1. Go to your repo → **Settings** → **General** → check **Allow auto-merge**
-2. Go to **Settings** → **Branches** → **Add branch protection rule** for `main`:
-   - Check **Require a pull request before merging**
-   - Check **Require status checks to pass before merging** (select your CI checks)
-   - Check **Require approvals** → set to 0 (or 1 if you want to approve manually)
-3. Claude's PRs labeled `auto-merge` will merge automatically once CI passes
-4. PRs labeled `needs-review` or `blocked` wait for you
+This works out of the box — no configuration needed. PRs labeled `needs-review` or `blocked` are never auto-merged and wait for you.
 
-**Start conservative:** Leave auto-merge disabled until you trust your CI coverage. The daily digest still tells you which PRs are low-risk even without auto-merge enabled.
+**To disable auto-merge:** Delete `.github/workflows/auto-merge.yml`.
 
 ## Cost Control
 
