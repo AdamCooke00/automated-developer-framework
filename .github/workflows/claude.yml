@@ -40,8 +40,11 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          allowed_tools: "Bash(gh pr create *),Bash(gh issue close *),Bash(gh label create *)"
-          claude_args: "--max-turns 25 --dangerously-skip-permissions"
+          claude_args: >-
+            --max-turns 25
+            --dangerously-skip-permissions
+            --allowedTools "Bash(gh pr create:*),Bash(gh issue close:*),Bash(gh label create:*)"
+            --append-system-prompt "IMPORTANT: After pushing changes, always create a PR using gh pr create. Do NOT provide a Create PR URL link. Use gh pr create --title <title> --body <body> directly."
 
       # Fallback: Use API key (pay-per-token)
       - name: Fallback to API key
@@ -49,5 +52,8 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          allowed_tools: "Bash(gh pr create *),Bash(gh issue close *),Bash(gh label create *)"
-          claude_args: "--max-turns 25 --dangerously-skip-permissions"
+          claude_args: >-
+            --max-turns 25
+            --dangerously-skip-permissions
+            --allowedTools "Bash(gh pr create:*),Bash(gh issue close:*),Bash(gh label create:*)"
+            --append-system-prompt "IMPORTANT: After pushing changes, always create a PR using gh pr create. Do NOT provide a Create PR URL link. Use gh pr create --title <title> --body <body> directly."
