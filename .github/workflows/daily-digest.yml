@@ -1,0 +1,92 @@
+name: Daily Digest
+
+on:
+  schedule:
+    - cron: "0 8 * * *" # 8am UTC daily — adjust to your timezone
+  workflow_dispatch: # Manual trigger from Actions tab
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+      id-token: write
+    env:
+      HAS_MAX_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' && 'true' || 'false' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      # Primary: Use Max subscription (no additional cost)
+      - name: Generate digest with Max subscription
+        id: max
+        if: env.HAS_MAX_TOKEN == 'true'
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Review the last 24 hours of activity in this repository.
+            Use the GitHub CLI (gh) to check recent PRs, issues, and commits.
+
+            If there was NO activity in the last 24 hours, respond with "No activity" and do nothing else.
+
+            If there WAS activity, create a GitHub issue with the title "Daily Digest — [today's date YYYY-MM-DD]" and add the label "daily-digest" (create the label if it doesn't exist).
+
+            The issue body should contain:
+
+            ## Completed
+            PRs merged and issues closed in the last 24 hours.
+
+            ## Needs Review
+            Open PRs awaiting review. For each PR, assess risk:
+            - CRITICAL: architecture changes, security-related, breaking changes, no tests — review before merge
+            - NORMAL: new features, refactors with tests — review when convenient
+            - LOW RISK: docs, formatting, dependency bumps, trivial fixes with passing CI — safe to auto-merge
+
+            ## Blocked
+            Anything that failed, has merge conflicts, or needs a human decision.
+
+            ## Upcoming
+            Open issues assigned to Claude or labeled for automation that haven't been started yet.
+
+            Keep the digest concise and scannable. Skip any section that has no items.
+          claude_args: "--max-turns 10"
+
+      # Fallback: Use API key (pay-per-token)
+      - name: Fallback to API key
+        if: steps.max.outcome != 'success'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Review the last 24 hours of activity in this repository.
+            Use the GitHub CLI (gh) to check recent PRs, issues, and commits.
+
+            If there was NO activity in the last 24 hours, respond with "No activity" and do nothing else.
+
+            If there WAS activity, create a GitHub issue with the title "Daily Digest — [today's date YYYY-MM-DD]" and add the label "daily-digest" (create the label if it doesn't exist).
+
+            The issue body should contain:
+
+            ## Completed
+            PRs merged and issues closed in the last 24 hours.
+
+            ## Needs Review
+            Open PRs awaiting review. For each PR, assess risk:
+            - CRITICAL: architecture changes, security-related, breaking changes, no tests — review before merge
+            - NORMAL: new features, refactors with tests — review when convenient
+            - LOW RISK: docs, formatting, dependency bumps, trivial fixes with passing CI — safe to auto-merge
+
+            ## Blocked
+            Anything that failed, has merge conflicts, or needs a human decision.
+
+            ## Upcoming
+            Open issues assigned to Claude or labeled for automation that haven't been started yet.
+
+            Keep the digest concise and scannable. Skip any section that has no items.
+          claude_args: "--max-turns 10"
