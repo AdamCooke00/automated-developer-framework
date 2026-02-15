@@ -234,20 +234,25 @@ Tests 3 and 4 hit the max-turns limit. This suggests Claude is spending turns on
 
 ## Changes Made During Testing
 
-### Workflow fixes (must port to template)
+### Workflow fixes (all ported to template ✅)
 
 | File | Change | Why |
 |---|---|---|
-| `claude.yml` | Added `--dangerously-skip-permissions` | Without this, Claude can't run `gh pr create`, `gh issue close`, etc. |
-| `claude-review.yml` | Added `--dangerously-skip-permissions` | Without this, Claude can't run `gh pr review` to post reviews |
-| `claude-review.yml` | Replaced `/review` prompt with explicit instructions | `/review` skill doesn't post to GitHub — need to tell Claude to use `gh pr review` |
-| `claude-review.yml` | Added `show_full_output: true` | Debug only — remove before finalizing |
+| `claude.yml` | Added `--dangerously-skip-permissions` | Required for `gh` commands |
+| `claude.yml` | Added `--allowedTools "Bash(gh pr create:*),...` | Adds `gh` to tool whitelist |
+| `claude.yml` | Added `--append-system-prompt` | Overrides "Create PR URL" behavior |
+| `claude-review.yml` | Added `--dangerously-skip-permissions` | Required for `gh pr review` |
+| `claude-review.yml` | Replaced `/review` with explicit prompt | `/review` doesn't post to GitHub |
+| `daily-digest.yml` | Added `--dangerously-skip-permissions` | Required for `gh issue create` |
+| `template-sync.yml` | Added `source_gh_token` + checkout `token` | Private repo access via PAT |
 
-### CLAUDE.md fixes (must add to template)
+### CLAUDE.md fixes (all ported to template ✅)
 
-1. "Always use `gh pr create` to open PRs. Do not just push to a branch and provide a link."
-2. "Do not include task checklists in issue comments."
-3. "Minimize tool calls — batch file reads, avoid reading files you don't need."
+1. "After pushing code changes, always create a PR using `gh pr create`"
+2. "Do not include task checklists in issue comments"
+3. "Minimize tool calls — batch file reads, avoid reading files you don't need"
+4. PR Risk Labeling section (auto-merge / needs-review / blocked)
+5. Output Style section (concise, bullet points, skip preamble)
 
 ---
 
@@ -303,6 +308,88 @@ Skipped to save API key costs. The fallback mechanism was verified at the plumbi
 
 ---
 
+## Post-Test: Auto PR Creation Fix
+
+### Problem
+Claude never created PRs — just pushed branches and provided a "Create PR ➔" URL link. This is the action's default behavior by design.
+
+### Root cause (3 attempts to solve)
+
+**Attempt 1:** Added `allowed_tools` input to the action's `with` block.
+- **Result:** `allowed_tools` is not a valid v1 input — silently ignored. Valid inputs listed in annotations.
+
+**Attempt 2:** Added `--append-system-prompt` to `claude_args` to override the "Provide a URL" instruction.
+- **Result:** System prompt was picked up but the action's built-in prompt still won, Claude still provided URL.
+
+**Attempt 3:** Added `--allowedTools "Bash(gh pr create:*),Bash(gh issue close:*),Bash(gh label create:*)"` to `claude_args` PLUS `--append-system-prompt`.
+- **Result:** ✅ **WORKED.** Claude created PR #12 automatically.
+
+### Why it works
+
+The action builds a whitelist of tools Claude can call:
+```
+ALLOWED_TOOLS: Edit,MultiEdit,Glob,Grep,LS,Read,Write,
+  mcp__github_comment__update_claude_comment,
+  Bash(git add *),Bash(git commit *),Bash(git push *),...
+```
+
+Only `Bash(git *)` patterns are included — no `Bash(gh *)`. Even `--dangerously-skip-permissions` doesn't expand this whitelist; it only auto-approves tools already in the list. The `--allowedTools` flag in `claude_args` merges additional tools into this list.
+
+### Key syntax notes
+- Use `--allowedTools` (capital T) in `claude_args`, NOT the action's `allowed_tools` input
+- Use colon syntax: `Bash(gh pr create:*)` not `Bash(gh pr create *)`
+- From `solutions.md`: `Bash(gh issue:*)`, `Bash(gh pr comment:*)` etc.
+- `--append-system-prompt` needed to override the "Provide URL" instruction
+
+### Working claude.yml snippet
+```yaml
+claude_args: >-
+  --max-turns 25
+  --dangerously-skip-permissions
+  --allowedTools "Bash(gh pr create:*),Bash(gh issue close:*),Bash(gh label create:*)"
+  --append-system-prompt "IMPORTANT: After pushing changes, always create a PR using gh pr create. Do NOT provide a Create PR URL link."
+```
+
+---
+
+## Post-Test: Template Sync
+
+### Problem
+Template-sync fails with `remote: Repository not found` because default `GITHUB_TOKEN` can't access private template repos.
+
+### Fix
+1. Create a PAT (`TEMPLATE_SYNC_PAT`) with `repo` + `read:org` scopes
+2. Use `source_gh_token` parameter (not deprecated `github_token`)
+3. Pass PAT to checkout step via `token` parameter
+
+### Result
+First test failed: `error validating token: missing required scope 'read:org'` — PAT was created with `repo` scope only. The `actions-template-sync` action uses `gh auth login` internally which requires `read:org`.
+
+**Status:** Partially verified. Workflow configuration is correct, needs PAT with `read:org` scope added.
+
+### Working template-sync.yml snippet
+```yaml
+steps:
+  - name: Checkout repository
+    uses: actions/checkout@v4
+    with:
+      token: ${{ secrets.TEMPLATE_SYNC_PAT }}
+  - name: Sync from template
+    uses: AndreasAugustin/actions-template-sync@v2
+    with:
+      source_repo_path: AdamCooke00/automated-developer-framework
+      upstream_branch: main
+      pr_labels: template_sync
+      pr_title: "chore: sync updates from template repository"
+      source_gh_token: ${{ secrets.TEMPLATE_SYNC_PAT }}
+```
+
+### PAT requirements
+- Scope: `repo` + `read:org`
+- Must have access to both the template repo and the child repo
+
+---
+
 ## Final Scorecard
 
 ```
@@ -318,25 +405,36 @@ Total: 109/130
 Autonomy level: HIGH (100+ threshold)
 ```
 
+### Post-test fixes verified
+- ✅ Auto PR creation — `--allowedTools` + `--append-system-prompt` (PR #12 created)
+- ✅ Review workflow — explicit prompt + `--dangerously-skip-permissions`
+- ✅ Daily digest — `--dangerously-skip-permissions`
+- ⚠️ Template sync — config correct, needs PAT with `read:org` scope
+
 ### Strengths
 - **Code quality is excellent** — follows conventions, writes comprehensive tests, handles edge cases
 - **Investigation skills are strong** — analyzes code for root causes, doesn't ask trivial clarifying questions
-- **Review quality is good** — when it works, catches most issues with concise actionable feedback
+- **Review quality is good** — catches most issues with concise actionable feedback
 - **Scope discipline** — stays focused, doesn't over-engineer
+- **Auto PR creation works** — with `--allowedTools` fix, Claude creates PRs directly
 
-### Weaknesses (fixable via CLAUDE.md + workflow changes)
-- **Never creates PRs** — pushes branches + "Create PR" link (behavioral, not permissions)
-- **Verbose output** — task checklists and summaries in every comment
-- **High turn count** — Tests 3/4 hit 26-turn max for moderate tasks ($0.65-0.76)
-- **Review workflow broken out of the box** — `/review` skill + default permissions don't work
+### Weaknesses (fixed or documented)
+- ~~Never creates PRs~~ → **Fixed** via `--allowedTools` in `claude_args`
+- **Verbose output** — task checklists still appear despite CLAUDE.md instruction (partially fixed)
+- **High turn count** — Tests 3/4 hit max-turns for moderate tasks ($0.65-0.76)
+- ~~Review workflow broken~~ → **Fixed** via explicit prompt + `--dangerously-skip-permissions`
 
-### Critical Template Fixes Required
+### All Template Fixes Applied
 
-**Workflow files (all 3):**
-1. Add `--dangerously-skip-permissions` to all `claude_args` — without this, Claude can't run `gh` commands to create PRs, post reviews, or create issues
-2. Replace `/review` prompt with explicit instructions to use `gh pr review`
+**Workflow files:**
+1. `claude.yml` — `--dangerously-skip-permissions` + `--allowedTools "Bash(gh pr create:*),..."` + `--append-system-prompt`
+2. `claude-review.yml` — Explicit prompt + `--dangerously-skip-permissions`
+3. `daily-digest.yml` — `--dangerously-skip-permissions`
+4. `template-sync.yml` — `source_gh_token` + checkout `token` for PAT
 
 **CLAUDE.md:**
-1. Add: "Always use `gh pr create` to open PRs after implementing changes"
-2. Add: "Do not include task checklists in issue comments"
-3. Strengthen: "Minimize tool calls" instruction
+1. Added: "After pushing code changes, always create a PR using `gh pr create`"
+2. Added: "Do not include task checklists in issue comments"
+3. Added: "Minimize tool calls" instruction
+4. Added: PR Risk Labeling section
+5. Added: Output Style section
