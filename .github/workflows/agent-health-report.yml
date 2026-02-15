@@ -29,6 +29,7 @@ jobs:
         continue-on-error: true
         uses: anthropics/claude-code-action@v1
         with:
+          allowed_bots: "claude"
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             Generate a weekly health report on Claude's activity and effectiveness.
@@ -91,6 +92,7 @@ jobs:
         if: steps.max.outcome != 'success' && steps.check_fallback.outputs.needed != 'false'
         uses: anthropics/claude-code-action@v1
         with:
+          allowed_bots: "claude"
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |
             Generate a weekly health report on Claude's activity and effectiveness.
