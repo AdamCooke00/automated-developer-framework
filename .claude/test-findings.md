@@ -355,9 +355,23 @@ Created digest issue with correct Completed/Needs Review/Blocked/Upcoming sectio
 
 ---
 
-## Open Issues to Fix
+## Final v2 Scorecard
+
+```
+Template sync:                   PASS
+Test 1 — Feature Implementation: 26/35
+Test 2 — Code Review Quality:    23/25
+Test 3 — Follow-up Iteration:    21/25
+Test 4 — Ambiguous Bug Report:   16/25
+Test 5 — Daily Digest:           18/20
+
+Total: 104/130
+Autonomy level: HIGH (100+ threshold)
+```
+
+## Open Issues (non-blocking)
 
 1. ~~**Double-charge bug**~~ — **FIXED.** Check step greps execution output for `error_max_turns` and skips fallback.
-2. **No risk labels** — Claude still not applying `auto-merge`/`needs-review`/`blocked` labels to PRs despite CLAUDE.md instructions.
-3. **Verbose output** — Task checklists still appear in issue comments despite CLAUDE.md instruction.
-4. **Max-turns too high?** — 25 turns may be unnecessary for most tasks. Consider 15.
+2. **No risk labels** — Claude still not applying `auto-merge`/`needs-review`/`blocked` labels to PRs despite CLAUDE.md instructions. May need `--allowedTools "Bash(gh pr edit:*)"` or stronger CLAUDE.md wording.
+3. **Verbose output** — Task checklists still appear in issue comments despite CLAUDE.md instruction. Behavioral — hard to override via instructions alone.
+4. ~~**Max-turns too high?**~~ — **Keeping at 25.** Community recommends 10-15 for implementation, but: (a) Max is free so higher turns cost nothing, (b) with double-charge fix the fallback no longer runs on max_turns, (c) lowering to 15 would have left Tests 1/3/4 incomplete. Review stays at 5, digest at 10.
