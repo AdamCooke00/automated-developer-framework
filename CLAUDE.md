@@ -74,6 +74,14 @@ Example:
 - One concern per PR — don't mix refactoring with features
 -->
 
+## Output Style (do not remove)
+
+- Be thorough in analysis but concise in output. Prefer bullet points over paragraphs.
+- Issue comments: answer the question directly, skip preamble and summaries of what you're about to do.
+- PR descriptions: state what changed and why in 2-3 sentences, then a bullet list of files changed.
+- Code review comments: one sentence per issue, include the fix. Skip praise.
+- Minimize tool calls: batch file reads, avoid reading files you don't need, prefer glob over individual reads.
+
 ## PR Risk Labeling (do not remove)
 
 When creating PRs, always assess risk and add exactly one of these labels:
