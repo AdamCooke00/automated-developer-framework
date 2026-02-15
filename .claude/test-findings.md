@@ -358,14 +358,33 @@ claude_args: >-
 Template-sync fails with `remote: Repository not found` because default `GITHUB_TOKEN` can't access private template repos.
 
 ### Fix
-1. Create a PAT (`TEMPLATE_SYNC_PAT`) with `repo` + `read:org` scopes
+1. Create a PAT (`TEMPLATE_SYNC_PAT`) with `repo` + `read:org` + `workflow` scopes
 2. Use `source_gh_token` parameter (not deprecated `github_token`)
 3. Pass PAT to checkout step via `token` parameter
+4. Enable "Allow GitHub Actions to create and approve pull requests" in repo settings
+5. Add `.templatesyncignore` to exclude project-specific files
 
-### Result
-First test failed: `error validating token: missing required scope 'read:org'` — PAT was created with `repo` scope only. The `actions-template-sync` action uses `gh auth login` internally which requires `read:org`.
+### Debugging timeline (4 attempts)
 
-**Status:** Partially verified. Workflow configuration is correct, needs PAT with `read:org` scope added.
+1. **Attempt 1:** Default `GITHUB_TOKEN` → `Repository not found` (can't access private template repo)
+2. **Attempt 2:** PAT with `repo` scope → `missing required scope 'read:org'` (action uses `gh auth login`)
+3. **Attempt 3:** PAT with `repo` + `read:org` + `workflow` → `GitHub Actions is not permitted to create or approve pull requests`
+4. **Attempt 4:** Same PAT + enabled "Allow GitHub Actions to create PRs" in repo settings → ✅ **WORKED.** PR #13 created.
+
+### Critical discovery: `.templatesyncignore`
+
+After the sync succeeded, the PR would have **overwritten** the project's custom `CLAUDE.md` and `README.md` with the template's generic versions. This would destroy all project-specific configuration.
+
+**Fix:** Added `.templatesyncignore` to the template:
+```
+CLAUDE.md
+README.md
+.claude/
+```
+
+This ensures only workflow files and framework config are synced — project-specific files are never touched.
+
+**Status:** ✅ Fully verified. Template-sync works end-to-end.
 
 ### Working template-sync.yml snippet
 ```yaml
@@ -411,7 +430,7 @@ Autonomy level: HIGH (100+ threshold)
 - ✅ Auto PR creation — `--allowedTools` + `--append-system-prompt` (PR #12 created)
 - ✅ Review workflow — explicit prompt + `--dangerously-skip-permissions`
 - ✅ Daily digest — `--dangerously-skip-permissions`
-- ⚠️ Template sync — config correct, needs PAT with `read:org` scope
+- ✅ Template sync — PAT (`repo`+`read:org`+`workflow`) + repo setting + `.templatesyncignore` (PR #13 created)
 
 ### Strengths
 - **Code quality is excellent** — follows conventions, writes comprehensive tests, handles edge cases
@@ -433,6 +452,7 @@ Autonomy level: HIGH (100+ threshold)
 2. `claude-review.yml` — Explicit prompt + `--dangerously-skip-permissions`
 3. `daily-digest.yml` — `--dangerously-skip-permissions`
 4. `template-sync.yml` — `source_gh_token` + checkout `token` for PAT
+5. `.templatesyncignore` — excludes CLAUDE.md, README.md, .claude/ from sync
 
 **CLAUDE.md:**
 1. Added: "After pushing code changes, always create a PR using `gh pr create`"
