@@ -115,27 +115,53 @@ Request comes in (@claude mention or PR opened)
 
 **OAuth token refresh:** Tokens from `claude setup-token` can expire. If you notice the Max step consistently failing, re-run `claude setup-token` and update the secret. The `/install-github-app` flow handles refresh more reliably.
 
+## Daily Digest & Auto-Merge
+
+### Daily digest
+
+The `daily-digest.yml` workflow runs every morning at 8am UTC. It reviews the last 24 hours of activity and creates a GitHub issue labeled `daily-digest` with:
+
+- **Completed** — PRs merged and issues closed
+- **Needs Review** — open PRs with risk assessment (critical / normal / low risk)
+- **Blocked** — anything that failed or needs your input
+- **Upcoming** — open issues assigned to Claude
+
+If there was no activity, no issue is created.
+
+**Mobile workflow:** Install the [GitHub mobile app](https://github.com/mobile). The digest issue creates a push notification. Open it, scan the summary, and tap into any PRs that need you.
+
+**Change the schedule:** Edit the cron in `daily-digest.yml`. Use [crontab.guru](https://crontab.guru) to set your preferred time.
+
+### Auto-merge setup (optional)
+
+Claude labels every PR it creates with a risk level (configured in CLAUDE.md). To let low-risk PRs merge automatically:
+
+1. Go to your repo → **Settings** → **General** → check **Allow auto-merge**
+2. Go to **Settings** → **Branches** → **Add branch protection rule** for `main`:
+   - Check **Require a pull request before merging**
+   - Check **Require status checks to pass before merging** (select your CI checks)
+   - Check **Require approvals** → set to 0 (or 1 if you want to approve manually)
+3. Claude's PRs labeled `auto-merge` will merge automatically once CI passes
+4. PRs labeled `needs-review` or `blocked` wait for you
+
+**Start conservative:** Leave auto-merge disabled until you trust your CI coverage. The daily digest still tells you which PRs are low-risk even without auto-merge enabled.
+
 ## Cost Control
 
-**No in-repo budget watchdog.** Cost is controlled at the Anthropic console level:
+Cost is controlled at the Anthropic console level — no in-repo watchdog needed:
 
-1. **One workspace per project** — each project gets its own API key from its own workspace with an independent monthly spend limit
+1. **One workspace per project** — independent monthly spend limits per project
 2. **Workspace limits are hard caps** — Anthropic stops API calls when the limit is reached
-3. **Max subscription absorbs most usage** — the API key only kicks in when Max is rate-limited
-4. **`--max-turns` caps per workflow** — prevents any single run from consuming excessive tokens
+3. **`--max-turns` caps per workflow** — prevents any single run from consuming excessive tokens
 
-**Cost guidance (API key usage only — Max subscription runs are free):**
+**Cost guidance (API key usage only — Max runs are free):**
 - Auto-reviews (5 turns, Sonnet) ≈ $0.01-0.05 per review
 - `@claude` implementations (25 turns) ≈ $0.10-1.00 depending on complexity
-- Anthropic reports average API cost is ~$6/developer/day, under $12 for 90% of users
-- With Max absorbing most runs, your actual API spend will be significantly lower
 - Set workspace limits to match your comfort level per project
 
-**If you have many projects:** Each project's workspace has its own limit. A runaway project can't consume another project's budget.
+**Monitor spend:** View per-workspace cost breakdowns at [platform.claude.com/claude-code](https://platform.claude.com/claude-code) or the Usage page in your [Anthropic console](https://console.anthropic.com).
 
-**Monitor spend:** View per-workspace cost breakdowns at [platform.claude.com/claude-code](https://platform.claude.com/claude-code) (API customers) or check the Usage page in your [Anthropic console](https://console.anthropic.com).
-
-**Note on workspaces:** When you first authenticate Claude Code, a workspace called "Claude Code" is auto-created. This is separate from the per-project workspaces you create manually. Your manual workspaces give you the per-project spend isolation.
+**Note on workspaces:** When you first authenticate Claude Code, a workspace called "Claude Code" is auto-created. This is separate from the per-project workspaces you create manually.
 
 ## Test That It Works
 
@@ -180,19 +206,13 @@ If the PR has merge conflicts (because you changed a workflow file the template 
 
 ## Improving CLAUDE.md Over Time
 
-As you use Claude on your project, you'll notice cases where it makes wrong assumptions or doesn't follow your preferences. Feed these corrections back into `CLAUDE.md` so they stick:
+When Claude makes wrong assumptions or doesn't follow your preferences, feed corrections back into `CLAUDE.md` so they stick:
 
-**In a PR or issue comment:**
 ```
-@claude Update CLAUDE.md to add this rule: always use fetch instead of axios for HTTP requests
-```
-
-**After a mistake:**
-```
-@claude That test approach was wrong — we use vitest, not jest. Update CLAUDE.md so you remember this.
+@claude Update CLAUDE.md to add this rule: always use vitest, not jest, for tests
 ```
 
-Claude will commit the CLAUDE.md change directly. Over time, your CLAUDE.md becomes a living document that captures your project's accumulated knowledge.
+Claude will commit the change directly. Over time, your CLAUDE.md becomes a living document that captures your project's accumulated knowledge.
 
 ## Customization
 
@@ -227,37 +247,6 @@ with:
 ```
 Then use `/ai` instead of `@claude` in comments.
 
-## Daily Digest & Auto-Merge
-
-### Daily digest
-
-The `daily-digest.yml` workflow runs every morning at 8am UTC. It reviews the last 24 hours of activity and creates a GitHub issue labeled `daily-digest` with:
-
-- **Completed** — PRs merged and issues closed
-- **Needs Review** — open PRs with risk assessment (critical / normal / low risk)
-- **Blocked** — anything that failed or needs your input
-- **Upcoming** — open issues assigned to Claude
-
-If there was no activity, no issue is created.
-
-**Mobile workflow:** Install the [GitHub mobile app](https://github.com/mobile). The digest issue creates a push notification. Open it, scan the summary, and tap into any PRs that need you.
-
-**Change the schedule:** Edit the cron in `daily-digest.yml`. Use [crontab.guru](https://crontab.guru) to set your preferred time.
-
-### Auto-merge setup (optional)
-
-Claude labels every PR it creates with a risk level (configured in CLAUDE.md). To let low-risk PRs merge automatically:
-
-1. Go to your repo → **Settings** → **General** → check **Allow auto-merge**
-2. Go to **Settings** → **Branches** → **Add branch protection rule** for `main`:
-   - Check **Require a pull request before merging**
-   - Check **Require status checks to pass before merging** (select your CI checks)
-   - Check **Require approvals** → set to 0 (or 1 if you want to approve manually)
-3. Claude's PRs labeled `auto-merge` will merge automatically once CI passes
-4. PRs labeled `needs-review` or `blocked` wait for you
-
-**Start conservative:** Leave auto-merge disabled until you trust your CI coverage. The daily digest still tells you which PRs are low-risk even without auto-merge enabled.
-
 ## What This Template Does NOT Do (v1)
 
 - **CI failure auto-fix** — Claude does not automatically respond to failed CI runs
@@ -286,6 +275,5 @@ README.md               This file
 - [CLAUDE.md best practices](https://code.claude.com/docs/en/memory)
 - [Anthropic API console](https://console.anthropic.com)
 - [Anthropic workspaces](https://support.anthropic.com/en/articles/9796807-creating-and-managing-workspaces)
-- [Usage & Cost API](https://platform.claude.com/docs/en/api/usage-cost-api)
 - [Managing costs](https://code.claude.com/docs/en/costs)
 - [Analytics dashboard](https://code.claude.com/docs/en/analytics)
