@@ -31,6 +31,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 1
+          token: ${{ secrets.PAT_TOKEN }}
 
       # Primary: Use Max subscription (no additional cost)
       - name: Run with Max subscription
