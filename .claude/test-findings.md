@@ -371,7 +371,7 @@ Autonomy level: HIGH (100+ threshold)
 
 ## Open Issues (non-blocking)
 
-1. ~~**Double-charge bug**~~ — **FIXED.** Check step greps execution output for `error_max_turns` and skips fallback.
-2. **No risk labels** — Claude still not applying `auto-merge`/`needs-review`/`blocked` labels to PRs despite CLAUDE.md instructions. May need `--allowedTools "Bash(gh pr edit:*)"` or stronger CLAUDE.md wording.
-3. **Verbose output** — Task checklists still appear in issue comments despite CLAUDE.md instruction. Behavioral — hard to override via instructions alone.
-4. ~~**Max-turns too high?**~~ — **Keeping at 25.** Community recommends 10-15 for implementation, but: (a) Max is free so higher turns cost nothing, (b) with double-charge fix the fallback no longer runs on max_turns, (c) lowering to 15 would have left Tests 1/3/4 incomplete. Review stays at 5, digest at 10.
+1. ~~**Double-charge bug**~~ — **FIXED.** Check step greps execution output for `error_max_turns` and skips fallback. Applied to all 3 workflows.
+2. ~~**No risk labels**~~ — **FIXED (untested).** Added `Bash(gh pr edit:*)` to `--allowedTools` and updated `--append-system-prompt` to instruct: `--label auto-merge|needs-review|blocked` on `gh pr create`. Will validate on next real project.
+3. **Verbose output** — Task checklists still appear in issue comments despite CLAUDE.md instruction. Behavioral — accepted as known limitation.
+4. ~~**Max-turns too high?**~~ — **Keeping at 25.** Community recommends 10-15, but: (a) Max is free so higher turns cost nothing, (b) double-charge fix prevents API waste, (c) lowering to 15 would have left Tests 1/3/4 incomplete. Review stays at 5, digest at 10.
