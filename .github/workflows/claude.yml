@@ -46,9 +46,31 @@ jobs:
             --allowedTools "Bash(gh pr create:*),Bash(gh issue close:*),Bash(gh label create:*)"
             --append-system-prompt "IMPORTANT: After pushing changes, always create a PR using gh pr create. Do NOT provide a Create PR URL link. Use gh pr create --title <title> --body <body> directly."
 
-      # Fallback: Use API key (pay-per-token)
-      - name: Fallback to API key
+      # Check if fallback is actually needed (avoid double-charging on max-turns)
+      - name: Check if fallback needed
+        id: check_fallback
         if: steps.max.outcome != 'success'
+        run: |
+          OUTPUT="/home/runner/work/_temp/claude-execution-output.json"
+          if [ -f "$OUTPUT" ]; then
+            SUBTYPE=$(jq -r '.subtype // "unknown"' "$OUTPUT" 2>/dev/null || echo "unknown")
+            NUM_TURNS=$(jq -r '.num_turns // 0' "$OUTPUT" 2>/dev/null || echo "0")
+            echo "Max step result: subtype=$SUBTYPE, turns=$NUM_TURNS"
+            if [ "$SUBTYPE" = "error_max_turns" ]; then
+              echo "Max hit turn limit after doing work — skipping fallback to avoid double charge"
+              echo "needed=false" >> $GITHUB_OUTPUT
+            else
+              echo "Max step failed (subtype=$SUBTYPE) — fallback needed"
+              echo "needed=true" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "No execution output found — fallback needed"
+            echo "needed=true" >> $GITHUB_OUTPUT
+          fi
+
+      # Fallback: Use API key (pay-per-token) — only on auth failures, not max-turns
+      - name: Fallback to API key
+        if: steps.max.outcome != 'success' && steps.check_fallback.outputs.needed != 'false'
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
