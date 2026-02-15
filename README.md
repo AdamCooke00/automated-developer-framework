@@ -9,6 +9,7 @@ A GitHub template repository pre-configured with Claude Code automation. Clone i
 - **PR size guardian** — automatically warns when PRs exceed 400 lines and suggests how to split them into smaller, reviewable chunks
 - **CI Doctor** — when any CI workflow fails, Claude automatically diagnoses the failure and posts a comment on the PR with what failed, why, and suggested fixes
 - **Daily digest** — every morning, Claude creates a summary issue with what was completed, what needs your review (with risk assessment), and what's blocked. One push notification per project on your phone.
+- **Agent health report** — every Friday at 9am UTC, Claude creates a weekly report on its own activity and effectiveness: PRs created/merged, merge rate, risk label distribution, failed workflow runs, and actionable recommendations
 - **Stale issue gardener** — every Monday, Claude reviews open issues, marks those inactive for 30+ days as stale, closes those inactive for 60+ days, and labels recently opened issues with no labels
 - **Doc Drift Detector** — every Monday, Claude compares documentation (README.md, CLAUDE.md) against actual code structure, and opens a PR to fix outdated file paths, commands, or directory references
 - **PR risk labeling** — Claude labels every PR it creates as `auto-merge`, `needs-review`, or `blocked` so you can triage across multiple projects
@@ -26,6 +27,7 @@ A GitHub template repository pre-configured with Claude Code automation. Clone i
 | **Your own PRs** | Just open a PR | Claude auto-reviews with inline comments + size check (warns if >400 lines) |
 | **CI failures** | (nothing — automatic) | Posts diagnostic comment on PR: what failed, why, suggested fix |
 | **Daily digest** | Read the daily-digest issue (mobile notification) | Created automatically — summarizes activity, flags what needs you |
+| **Agent health report** | (nothing — automatic) | Runs weekly Friday 9am UTC — tracks PRs, merge rate, risk labels, workflow failures, with recommendations |
 | **Stale issue gardener** | (nothing — automatic) | Runs weekly Monday 9am UTC — marks stale issues, closes abandoned ones, labels new issues |
 | **Doc Drift Detector** | (nothing — automatic) | Runs weekly Monday 10am UTC — compares docs against code, opens PR with fixes |
 | **Actions tab** | Check workflow runs for cost, turn count, errors | Logs show every step Claude took |
@@ -261,6 +263,7 @@ Edit the `claude_args` line in each workflow file (update both the Max and fallb
 | `.github/workflows/pr-size-guardian.yml` | `--max-turns 3` | How many steps Claude takes checking PR size |
 | `.github/workflows/ci-doctor.yml` | `--max-turns 10` | How many steps Claude takes diagnosing CI failures |
 | `.github/workflows/daily-digest.yml` | `--max-turns 10` | How many steps Claude takes generating the digest |
+| `.github/workflows/agent-health-report.yml` | `--max-turns 10` | How many steps Claude takes generating the health report |
 | `.github/workflows/stale-issue-gardener.yml` | `--max-turns 10` | How many steps Claude takes managing stale issues |
 | `.github/workflows/doc-drift-detector.yml` | `--max-turns 10` | How many steps Claude takes detecting doc drift |
 
@@ -301,6 +304,7 @@ These can all be added later as separate workflow files.
   pr-size-guardian.yml      Warns when PRs exceed 400 lines, suggests how to split
   ci-doctor.yml             CI failure diagnosis — automatic diagnostic comments on failed workflows
   daily-digest.yml          Daily summary of activity and PRs needing review
+  agent-health-report.yml   Weekly health report — tracks Claude's PRs, merge rate, risk labels, workflow failures
   stale-issue-gardener.yml  Weekly issue maintenance — marks stale, closes abandoned, labels new issues
   doc-drift-detector.yml    Weekly doc drift detection — compares docs against code, opens PR with fixes
   template-sync.yml         Monthly sync from template repo (opens PRs with updates)
