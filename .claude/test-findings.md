@@ -385,8 +385,10 @@ steps:
 ```
 
 ### PAT requirements
-- Scope: `repo` + `read:org`
+- Scopes: `repo` + `read:org` + `workflow`
+- `workflow` scope required because template contains `.github/workflows/` files
 - Must have access to both the template repo and the child repo
+- Repo setting required: Actions → General → "Allow GitHub Actions to create and approve pull requests"
 
 ---
 
