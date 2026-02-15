@@ -6,6 +6,7 @@ A GitHub template repository pre-configured with Claude Code automation. Clone i
 
 - **`@claude` on issues and PRs** — mention `@claude` in any issue or PR comment, and Claude reads the repo, implements the request, and pushes commits or opens a PR
 - **Automatic code review** — every PR is reviewed by Claude when opened or updated, with inline comments and a summary
+- **PR size guardian** — automatically warns when PRs exceed 400 lines and suggests how to split them into smaller, reviewable chunks
 - **CI Doctor** — when any CI workflow fails, Claude automatically diagnoses the failure and posts a comment on the PR with what failed, why, and suggested fixes
 - **Daily digest** — every morning, Claude creates a summary issue with what was completed, what needs your review (with risk assessment), and what's blocked. One push notification per project on your phone.
 - **Stale issue gardener** — every Monday, Claude reviews open issues, marks those inactive for 30+ days as stale, closes those inactive for 60+ days, and labels recently opened issues with no labels
@@ -22,7 +23,7 @@ A GitHub template repository pre-configured with Claude Code automation. Clone i
 | **Issue comments** | Reply with `@claude` + follow-up or correction | Continues work on same issue, adjusts approach |
 | **PR comments** | Comment `@claude fix X` on Claude's PR | Pushes new commits to the PR branch |
 | **PR review** | Submit review with `@claude` in body | Addresses review feedback, pushes fixes |
-| **Your own PRs** | Just open a PR | Claude auto-reviews with inline comments |
+| **Your own PRs** | Just open a PR | Claude auto-reviews with inline comments + size check (warns if >400 lines) |
 | **CI failures** | (nothing — automatic) | Posts diagnostic comment on PR: what failed, why, suggested fix |
 | **Daily digest** | Read the daily-digest issue (mobile notification) | Created automatically — summarizes activity, flags what needs you |
 | **Stale issue gardener** | (nothing — automatic) | Runs weekly Monday 9am UTC — marks stale issues, closes abandoned ones, labels new issues |
@@ -257,6 +258,7 @@ Edit the `claude_args` line in each workflow file (update both the Max and fallb
 |---|---|---|
 | `.github/workflows/claude.yml` | `--max-turns 25` | How many steps Claude takes on `@claude` requests |
 | `.github/workflows/claude-review.yml` | `--max-turns 5` | How many steps Claude takes during review |
+| `.github/workflows/pr-size-guardian.yml` | `--max-turns 3` | How many steps Claude takes checking PR size |
 | `.github/workflows/ci-doctor.yml` | `--max-turns 10` | How many steps Claude takes diagnosing CI failures |
 | `.github/workflows/daily-digest.yml` | `--max-turns 10` | How many steps Claude takes generating the digest |
 | `.github/workflows/stale-issue-gardener.yml` | `--max-turns 10` | How many steps Claude takes managing stale issues |
@@ -296,6 +298,7 @@ These can all be added later as separate workflow files.
 .github/workflows/
   claude.yml                Reactive workflow — responds to @claude mentions
   claude-review.yml         Auto-review — reviews every PR on open/push
+  pr-size-guardian.yml      Warns when PRs exceed 400 lines, suggests how to split
   ci-doctor.yml             CI failure diagnosis — automatic diagnostic comments on failed workflows
   daily-digest.yml          Daily summary of activity and PRs needing review
   stale-issue-gardener.yml  Weekly issue maintenance — marks stale, closes abandoned, labels new issues
