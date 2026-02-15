@@ -53,8 +53,10 @@ jobs:
         run: |
           OUTPUT="/home/runner/work/_temp/claude-execution-output.json"
           if [ -f "$OUTPUT" ]; then
-            SUBTYPE=$(jq -r '.subtype // "unknown"' "$OUTPUT" 2>/dev/null || echo "unknown")
-            NUM_TURNS=$(jq -r '.num_turns // 0' "$OUTPUT" 2>/dev/null || echo "0")
+            # File is JSON lines (one object per line) — last line has the result
+            LAST_LINE=$(tail -1 "$OUTPUT")
+            SUBTYPE=$(echo "$LAST_LINE" | jq -r '.subtype // "unknown"' 2>/dev/null || echo "unknown")
+            NUM_TURNS=$(echo "$LAST_LINE" | jq -r '.num_turns // 0' 2>/dev/null || echo "0")
             echo "Max step result: subtype=$SUBTYPE, turns=$NUM_TURNS"
             if [ "$SUBTYPE" = "error_max_turns" ]; then
               echo "Max hit turn limit after doing work — skipping fallback to avoid double charge"
