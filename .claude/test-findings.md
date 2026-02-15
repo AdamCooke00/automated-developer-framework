@@ -47,7 +47,7 @@ Fresh test run after all v1 fixes were ported to template and synced to adf-test
 | Test 1: Feature implementation | ✅ Complete | 26/35 | PR created (fix works!), but no risk label, double-charge bug |
 | Test 2: Auto-review quality | ✅ Complete | 23/25 | 8/8 bugs caught (up from 5/8 in v1), excellent review |
 | Test 3: Follow-up correction | ✅ Complete | 21/25 | Both features implemented, double-charge bug again ($0.81 wasted) |
-| Test 4: Underspecified bug report | Pending | — | — |
+| Test 4: Underspecified bug report | ✅ Complete | 16/25 | Correct investigation but hit max-turns; double-charge fix verified |
 | Test 5: Daily digest | Pending | — | — |
 
 ---
@@ -194,6 +194,46 @@ Fallback: 27 turns, $0.81, `success` — started from scratch, created PR #21 wi
 | Cost/efficiency | 1/5 | Double-charge: $0.81 wasted on duplicate fallback |
 
 **Adjusted Total: 21/25** (code quality excellent, but double-charge and output issues drag score down)
+
+---
+
+### v2 Test 4: Underspecified Bug Report (16/25)
+
+**Issue:** #30 | **PR:** none (hit max-turns before push) | **Auth:** Max only (double-charge fix prevented fallback) | **Turns:** 26 (max) | **Cost:** $0.67 Max only (no API charges)
+
+#### Double-charge fix validation: PASS
+
+Max hit `error_max_turns` → check step detected it → fallback **skipped**. Without the fix, this would have incurred ~$0.65-0.80 in API charges. Fix saved real money.
+
+#### What Claude did
+
+- Investigated the code and identified `ensure_ascii` and UTF-8 encoding as the issue (same finding as v1)
+- Made code changes to `src/main.py` (lines 23, 38): added `ensure_ascii=False` and explicit UTF-8 encoding
+- Hit max_turns before it could: add tests, run tests, commit, push, or create PR
+- No branch pushed, no PR created — work was lost when runner terminated
+
+#### Assessment
+
+- **Investigation:** Correct — analyzed code, found real issue ✅
+- **Root cause:** Correct — `ensure_ascii=False` is the right fix ✅
+- **Autonomy:** Good — didn't ask for clarification, made reasonable assumptions ✅
+- **Completion:** Failed — hit max turns before committing ❌
+- **PR creation:** N/A — never got that far
+- **Communication:** Verbose — still has task checklist ❌
+
+#### Scores
+
+| Dimension | Score | Notes |
+|---|---|---|
+| Investigation | 5/5 | Analyzed code, found real issue |
+| Root cause | 4/5 | Correct fix (ensure_ascii + UTF-8) |
+| Test-first thinking | 0/5 | Never got to write tests (hit max turns) |
+| Autonomy | 5/5 | Didn't ask for clarification |
+| Communication | 2/5 | Verbose output with task checklist |
+
+**Total: 16/25** (correct approach but task incomplete due to turn limit)
+
+**Note:** In v1, this same test completed with 23/25 (found fix + wrote 10 tests + pushed). The difference is v1 used Max only (no fallback), and the task completed within turns. The incomplete result here is a tradeoff of the double-charge fix — but saving $0.80 per incident is worth it. The user can follow up with `@claude continue` to finish the work.
 
 ---
 
