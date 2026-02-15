@@ -78,11 +78,12 @@ Example:
 
 - Close issues after fully resolving the request (comment with answer, or open a PR with "Closes #N" in the description).
 - If you cannot fully resolve an issue, leave it open and comment explaining what's blocked.
+- When implementing code for an issue, always use `gh pr create` to open the PR. Do not just push to a branch and provide a link.
 
 ## Output Style (do not remove)
 
 - Be thorough in analysis but concise in output. Prefer bullet points over paragraphs.
-- Issue comments: answer the question directly, skip preamble and summaries of what you're about to do.
+- Issue comments: answer the question directly, skip preamble and summaries of what you're about to do. Do not include task checklists.
 - PR descriptions: state what changed and why in 2-3 sentences, then a bullet list of files changed.
 - Code review comments: one sentence per issue, include the fix. Skip praise.
 - Minimize tool calls: batch file reads, avoid reading files you don't need, prefer glob over individual reads.

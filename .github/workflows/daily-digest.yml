@@ -55,7 +55,7 @@ jobs:
             Open issues assigned to Claude or labeled for automation that haven't been started yet.
 
             Keep the digest concise and scannable. Skip any section that has no items.
-          claude_args: "--max-turns 10"
+          claude_args: "--max-turns 10 --dangerously-skip-permissions"
 
       # Fallback: Use API key (pay-per-token)
       - name: Fallback to API key
@@ -89,4 +89,4 @@ jobs:
             Open issues assigned to Claude or labeled for automation that haven't been started yet.
 
             Keep the digest concise and scannable. Skip any section that has no items.
-          claude_args: "--max-turns 10"
+          claude_args: "--max-turns 10 --dangerously-skip-permissions"

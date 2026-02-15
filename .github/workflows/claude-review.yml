@@ -27,8 +27,12 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: "/review"
-          claude_args: "--max-turns 5"
+          prompt: |
+            Review this pull request. Use `gh pr diff` to read the changes,
+            then post your review using `gh pr review` with the --comment flag
+            and a markdown body. Focus on bugs, convention violations, and
+            missing tests. One sentence per issue with the fix. Skip praise.
+          claude_args: "--max-turns 5 --dangerously-skip-permissions"
 
       # Fallback: Use API key (pay-per-token)
       - name: Fallback to API key
@@ -36,5 +40,9 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          prompt: "/review"
-          claude_args: "--max-turns 5"
+          prompt: |
+            Review this pull request. Use `gh pr diff` to read the changes,
+            then post your review using `gh pr review` with the --comment flag
+            and a markdown body. Focus on bugs, convention violations, and
+            missing tests. One sentence per issue with the fix. Skip praise.
+          claude_args: "--max-turns 5 --dangerously-skip-permissions"

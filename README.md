@@ -11,6 +11,29 @@ A GitHub template repository pre-configured with Claude Code automation. Clone i
 - **Template sync** — when this template is updated, downstream repos automatically receive a PR with the changes
 - **Max-first auth** — uses your Max subscription first (already paid for), falls back to API key only when needed
 
+## How You Work With Claude
+
+| Where | What you do | What Claude does |
+|---|---|---|
+| **GitHub Issues** | Create issue with `@claude` + task description | Reads issue, implements, opens PR, closes issue |
+| **Issue comments** | Reply with `@claude` + follow-up or correction | Continues work on same issue, adjusts approach |
+| **PR comments** | Comment `@claude fix X` on Claude's PR | Pushes new commits to the PR branch |
+| **PR review** | Submit review with `@claude` in body | Addresses review feedback, pushes fixes |
+| **Your own PRs** | Just open a PR | Claude auto-reviews with inline comments |
+| **Daily digest** | Read the daily-digest issue (mobile notification) | Created automatically — summarizes activity, flags what needs you |
+| **Actions tab** | Check workflow runs for cost, turn count, errors | Logs show every step Claude took |
+
+**Automation boundaries:**
+- Claude works autonomously within a single issue/PR until it completes or hits `--max-turns`
+- It does NOT chain tasks (finishing issue A doesn't make it start issue B)
+- It does NOT act without a trigger (`@claude` mention or PR open)
+- You control pace by controlling when you create issues and respond to PRs
+
+**Multi-project management:**
+- Each project has its own daily digest — one mobile notification per project per day
+- https://github.com/pulls shows all open PRs across repos in one view
+- GitHub notification settings let you filter by repo/label
+
 ## Setup After Cloning
 
 ### Step 1: Create your repo from this template
@@ -230,7 +253,7 @@ Lower = cheaper and faster. Higher = Claude can handle more complex tasks.
 ### Change the model
 Add `--model` to `claude_args` in the workflow files:
 ```yaml
-claude_args: "--max-turns 25 --model claude-sonnet-4-5-20250929"
+claude_args: "--max-turns 25 --dangerously-skip-permissions --model claude-sonnet-4-5-20250929"
 ```
 
 Available models:
@@ -243,7 +266,7 @@ Add the `trigger_phrase` input to the claude.yml workflow steps:
 with:
   claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
   trigger_phrase: "/ai"
-  claude_args: "--max-turns 25"
+  claude_args: "--max-turns 25 --dangerously-skip-permissions"
 ```
 Then use `/ai` instead of `@claude` in comments.
 
