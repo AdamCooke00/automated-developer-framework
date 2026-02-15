@@ -84,9 +84,12 @@ Go to your GitHub repo → **Settings** → **Secrets and variables** → **Acti
 |---|---|---|
 | `CLAUDE_CODE_OAUTH_TOKEN` | Run `claude setup-token` in your terminal | Recommended (uses your Max subscription) |
 | `ANTHROPIC_API_KEY` | From the workspace you created in Step 2 | Recommended (fallback when Max is rate-limited) |
+| `PAT_TOKEN` | GitHub PAT (classic) with `repo` and `workflow` scopes | Required if Claude needs to create or modify workflow files |
 | `TEMPLATE_SYNC_PAT` | GitHub PAT with `repo`, `read:org`, `workflow` scopes (see Step 5) | Required if template repo is private |
 
 You need **at least one** of the first two. Both is ideal — see [How Auth Works](#how-auth-works) below.
+
+**Why `PAT_TOKEN`?** GitHub's default `GITHUB_TOKEN` cannot create or modify files in `.github/workflows/`. If you ask Claude to create new workflow files via issues, it needs a PAT with the `workflow` scope. To create one: go to https://github.com/settings/tokens → **Generate new token (classic)** → select **`repo`** and **`workflow`** scopes → add it as a secret: `gh secret set PAT_TOKEN -R <your-repo>`.
 
 ### Step 5: Configure template sync
 
