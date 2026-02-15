@@ -51,22 +51,12 @@ jobs:
         id: check_fallback
         if: steps.max.outcome != 'success'
         run: |
+          # Check execution output for max-turns (avoid paying for fallback when work was done)
           OUTPUT="/home/runner/work/_temp/claude-execution-output.json"
-          if [ -f "$OUTPUT" ]; then
-            # File is JSON lines (one object per line) — last line has the result
-            LAST_LINE=$(tail -1 "$OUTPUT")
-            SUBTYPE=$(echo "$LAST_LINE" | jq -r '.subtype // "unknown"' 2>/dev/null || echo "unknown")
-            NUM_TURNS=$(echo "$LAST_LINE" | jq -r '.num_turns // 0' 2>/dev/null || echo "0")
-            echo "Max step result: subtype=$SUBTYPE, turns=$NUM_TURNS"
-            if [ "$SUBTYPE" = "error_max_turns" ]; then
-              echo "Max hit turn limit after doing work — skipping fallback to avoid double charge"
-              echo "needed=false" >> $GITHUB_OUTPUT
-            else
-              echo "Max step failed (subtype=$SUBTYPE) — fallback needed"
-              echo "needed=true" >> $GITHUB_OUTPUT
-            fi
+          if [ -f "$OUTPUT" ] && grep -q "error_max_turns" "$OUTPUT" 2>/dev/null; then
+            echo "Max hit turn limit after doing work — skipping fallback"
+            echo "needed=false" >> $GITHUB_OUTPUT
           else
-            echo "No execution output found — fallback needed"
             echo "needed=true" >> $GITHUB_OUTPUT
           fi
 
