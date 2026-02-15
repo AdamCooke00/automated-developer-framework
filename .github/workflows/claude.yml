@@ -43,8 +43,8 @@ jobs:
           claude_args: >-
             --max-turns 25
             --dangerously-skip-permissions
-            --allowedTools "Bash(gh pr create:*),Bash(gh issue close:*),Bash(gh label create:*)"
-            --append-system-prompt "IMPORTANT: After pushing changes, always create a PR using gh pr create. Do NOT provide a Create PR URL link. Use gh pr create --title <title> --body <body> directly."
+            --allowedTools "Bash(gh pr create:*),Bash(gh pr edit:*),Bash(gh issue close:*),Bash(gh label create:*)"
+            --append-system-prompt "IMPORTANT: After pushing changes, always create a PR using gh pr create with a --label flag. Use exactly one of: --label auto-merge, --label needs-review, or --label blocked. Default to needs-review when uncertain. Do NOT provide a Create PR URL link. Use gh pr create --title <title> --body <body> --label <risk-label> directly."
 
       # Check if fallback is actually needed (avoid double-charging on max-turns)
       - name: Check if fallback needed
@@ -69,5 +69,5 @@ jobs:
           claude_args: >-
             --max-turns 25
             --dangerously-skip-permissions
-            --allowedTools "Bash(gh pr create:*),Bash(gh issue close:*),Bash(gh label create:*)"
-            --append-system-prompt "IMPORTANT: After pushing changes, always create a PR using gh pr create. Do NOT provide a Create PR URL link. Use gh pr create --title <title> --body <body> directly."
+            --allowedTools "Bash(gh pr create:*),Bash(gh pr edit:*),Bash(gh issue close:*),Bash(gh label create:*)"
+            --append-system-prompt "IMPORTANT: After pushing changes, always create a PR using gh pr create with a --label flag. Use exactly one of: --label auto-merge, --label needs-review, or --label blocked. Default to needs-review when uncertain. Do NOT provide a Create PR URL link. Use gh pr create --title <title> --body <body> --label <risk-label> directly."

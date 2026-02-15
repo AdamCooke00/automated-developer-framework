@@ -57,9 +57,22 @@ jobs:
             Keep the digest concise and scannable. Skip any section that has no items.
           claude_args: "--max-turns 10 --dangerously-skip-permissions"
 
-      # Fallback: Use API key (pay-per-token)
-      - name: Fallback to API key
+      # Check if fallback is actually needed (avoid double-charging on max-turns)
+      - name: Check if fallback needed
+        id: check_fallback
         if: steps.max.outcome != 'success'
+        run: |
+          OUTPUT="/home/runner/work/_temp/claude-execution-output.json"
+          if [ -f "$OUTPUT" ] && grep -q "error_max_turns" "$OUTPUT" 2>/dev/null; then
+            echo "Max hit turn limit after doing work — skipping fallback"
+            echo "needed=false" >> $GITHUB_OUTPUT
+          else
+            echo "needed=true" >> $GITHUB_OUTPUT
+          fi
+
+      # Fallback: Use API key (pay-per-token) — only on auth failures, not max-turns
+      - name: Fallback to API key
+        if: steps.max.outcome != 'success' && steps.check_fallback.outputs.needed != 'false'
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
