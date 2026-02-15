@@ -48,7 +48,7 @@ Fresh test run after all v1 fixes were ported to template and synced to adf-test
 | Test 2: Auto-review quality | ✅ Complete | 23/25 | 8/8 bugs caught (up from 5/8 in v1), excellent review |
 | Test 3: Follow-up correction | ✅ Complete | 21/25 | Both features implemented, double-charge bug again ($0.81 wasted) |
 | Test 4: Underspecified bug report | ✅ Complete | 16/25 | Correct investigation but hit max-turns; double-charge fix verified |
-| Test 5: Daily digest | Pending | — | — |
+| Test 5: Daily digest | ✅ Complete | 18/20 | Accurate, well-categorized, good risk assessment |
 
 ---
 
@@ -234,6 +234,37 @@ Max hit `error_max_turns` → check step detected it → fallback **skipped**. W
 **Total: 16/25** (correct approach but task incomplete due to turn limit)
 
 **Note:** In v1, this same test completed with 23/25 (found fix + wrote 10 tests + pushed). The difference is v1 used Max only (no fallback), and the task completed within turns. The incomplete result here is a tradeoff of the double-charge fix — but saving $0.80 per incident is worth it. The user can follow up with `@claude continue` to finish the work.
+
+---
+
+### v2 Test 5: Daily Digest (18/20)
+
+**Issue created:** #31 "Daily Digest — 2026-02-15" | **Auth:** Max subscription | **Label:** `daily-digest`
+
+#### Digest content
+
+**Completed:** 1 commit merged (double-charge fix cleanup)
+
+**Needs Review:** 4 open PRs with correct risk assessments:
+- PR #28 (search command) — NORMAL risk ✅
+- PR #25 (priority field) — NORMAL risk ✅
+- PR #23 (special characters fix) — LOW risk ✅
+- PR #18 (CSV export — our planted bad code) — CRITICAL risk ✅ (correctly flagged missing tests)
+
+**Blocked:** None
+
+**Upcoming:** Correctly identified open issues #30, #29, #26 as not yet started. Also noted #30 is a duplicate of #22.
+
+#### Scores
+
+| Dimension | Score | Notes |
+|---|---|---|
+| Accuracy | 5/5 | Correctly categorized all PRs, issues, and activity |
+| Risk assessment | 5/5 | PR #18 correctly CRITICAL, PR #23 correctly LOW, others NORMAL |
+| Scannability | 4/5 | Clean structure, easy to scan in 30 seconds |
+| Conciseness | 4/5 | Good but PR descriptions could be slightly shorter |
+
+**Total: 18/20** (up from 16/20 in v1)
 
 ---
 
