@@ -56,6 +56,29 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
 
+      # Detect plan approval and remove planning label
+      - name: Detect plan approval and remove planning label
+        if: |
+          github.event_name == 'issue_comment' &&
+          steps.mode.outputs.planning == 'true' &&
+          (
+            contains(github.event.comment.body, 'approve') ||
+            contains(github.event.comment.body, 'implement') ||
+            contains(github.event.comment.body, 'proceed')
+          )
+        run: |
+          ISSUE_NUM="${{ github.event.issue.number }}"
+          echo "Plan approval detected — removing planning label to switch to implementation mode"
+          if gh issue edit "$ISSUE_NUM" --remove-label planning; then
+            echo "Planning label removed successfully"
+            # Update the mode output to switch to implementation for this run
+            echo "planning=false" >> $GITHUB_OUTPUT
+          else
+            echo "Warning: Failed to remove planning label from issue #$ISSUE_NUM"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+
       # Apply working label to indicate agent is actively working
       - name: Apply working label
         run: |
@@ -179,6 +202,34 @@ jobs:
           if [ -n "$ISSUE_NUM" ]; then
             if ! gh issue edit "$ISSUE_NUM" --remove-label claude-working; then
               echo "Warning: Failed to remove claude-working label from issue #$ISSUE_NUM"
+            fi
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+
+      # Remove planning label after implementation completes
+      - name: Remove planning label after implementation
+        if: |
+          always() &&
+          steps.mode.outputs.planning != 'true' &&
+          (github.event_name == 'issues' || github.event_name == 'issue_comment')
+        run: |
+          ISSUE_NUM=""
+          if [ "${{ github.event_name }}" = "issues" ]; then
+            ISSUE_NUM="${{ github.event.issue.number }}"
+          elif [ "${{ github.event_name }}" = "issue_comment" ]; then
+            ISSUE_NUM="${{ github.event.issue.number }}"
+          fi
+          if [ -n "$ISSUE_NUM" ]; then
+            # Only remove if it exists
+            if gh issue view "$ISSUE_NUM" --json labels --jq '[.labels[].name] | join(",")' | grep -q "planning"; then
+              if gh issue edit "$ISSUE_NUM" --remove-label planning; then
+                echo "Planning label removed after implementation completed"
+              else
+                echo "Warning: Failed to remove planning label from issue #$ISSUE_NUM"
+              fi
+            else
+              echo "No planning label to remove"
             fi
           fi
         env:
