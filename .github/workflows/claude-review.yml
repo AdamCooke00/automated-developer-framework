@@ -79,7 +79,7 @@ jobs:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           # Count existing auto-fix-request markers to prevent infinite loops
-          MARKER_COUNT=$(gh pr view ${{ github.event.pull_request.number }} --json comments --jq '.comments[].body' | grep -c '<auto-fix-request>' || echo "0")
+          MARKER_COUNT=$(gh pr view ${{ github.event.pull_request.number }} --json comments --jq '.comments[].body' | grep -c '<!-- review-fix-cycle -->' || echo "0")
 
           if [ "$MARKER_COUNT" -ge 2 ]; then
             echo "Auto-fix cycle limit reached (2 iterations). Skipping fix request."
@@ -93,9 +93,7 @@ jobs:
           # Check if review found issues (case-insensitive check)
           if echo "$REVIEW_BODY" | head -n 1 | grep -iq "## Issues Found"; then
             echo "Review found issues. Posting auto-fix request..."
-            gh pr comment ${{ github.event.pull_request.number }} --body "<auto-fix-request>
-
-@claude The automated code review found issues that need fixing. Read the review comments above, fix the identified bugs and issues, commit, and push."
+            gh pr comment ${{ github.event.pull_request.number }} --body "<!-- review-fix-cycle --> @claude The automated code review found issues that need fixing. Read the review comments above, fix the identified bugs and issues, commit, and push."
           else
             echo "No issues found in review or review body empty. Skipping fix request."
           fi
