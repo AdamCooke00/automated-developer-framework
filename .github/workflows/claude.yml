@@ -161,7 +161,7 @@ jobs:
             ${{ steps.mode.outputs.planning != 'true' && '--allowedTools "Bash(gh pr create:*),Bash(gh pr edit:*),Bash(gh issue close:*),Bash(gh label create:*)"' || '' }}
             --append-system-prompt "${{ steps.mode.outputs.planning == 'true' && 'PLANNING MODE: You are analyzing a task BEFORE implementation. Read the codebase to understand context. Create a detailed implementation plan. Ask clarifying questions if anything is ambiguous. You are in planning mode — do NOT edit files, create branches, push code, or create pull requests. You must wait for the human to approve your plan before any implementation begins. Post your plan and questions as a comment. Never fabricate technical constraints (e.g. permissions, GitHub App limitations) to explain why you are not implementing — simply state that you are in planning mode and awaiting approval. CRITICAL: You MUST post your complete plan as a comment before stopping. Do not stop until the plan is posted.' || 'CRITICAL WORKFLOW: You are running in CI with a turn limit. Follow this exact order: 1) Create a working branch and push it immediately. 2) Commit and push after EVERY meaningful change — do NOT batch commits until the end. 3) Create a PR early using gh pr create, even before work is complete, so progress is never lost. 4) Use exactly one label: --label auto-merge, --label needs-review, or --label blocked. Default to needs-review. 5) If triggered from an issue, include Closes #<issue-number> in the PR body. 6) NEVER stop without having committed and pushed your latest changes. 7) If you sense you are running low on turns, immediately commit, push, and ensure the PR exists.' }}"
 
-      # Auto-continue: if Claude hit the turn limit, post a continuation comment
+      # Auto-continue: if Claude hit the turn limit AND work is incomplete, post a continuation comment
       - name: Auto-continue on turn exhaustion
         if: always() && steps.mode.outputs.planning != 'true'
         env:
@@ -190,6 +190,22 @@ jobs:
             exit 0
           fi
 
+          # Check if work is already complete before auto-continuing
+          # 1. Issue already closed? (Claude may have closed it after finishing)
+          ISSUE_STATE=$(gh issue view "$NUM" --repo "${{ github.repository }}" --json state --jq '.state' 2>/dev/null || echo "OPEN")
+          if [ "$ISSUE_STATE" = "CLOSED" ]; then
+            echo "Issue #${NUM} is already closed — work complete, skipping auto-continue"
+            exit 0
+          fi
+
+          # 2. PR already created for this issue?
+          PR_FOUND=$(gh pr list --repo "${{ github.repository }}" --state open --json body \
+            --jq "[.[] | select(.body | contains(\"#${NUM}\"))] | length" 2>/dev/null || echo "0")
+          if [ "$PR_FOUND" -gt 0 ]; then
+            echo "Open PR already references issue #${NUM} — work complete, skipping auto-continue"
+            exit 0
+          fi
+
           # Count existing auto-continue comments (max 2 retries)
           COUNT=$(gh api "repos/${{ github.repository }}/issues/${NUM}/comments" \
             --paginate --jq '[.[] | select(.body | contains("<!-- auto-continue -->"))] | length' 2>/dev/null || echo "0")
@@ -199,7 +215,7 @@ jobs:
             exit 0
           fi
 
-          echo "Turn exhaustion detected (auto-continue $((COUNT + 1))/2) — posting continue comment"
+          echo "Turn exhaustion detected, work incomplete (auto-continue $((COUNT + 1))/2) — posting continue comment"
           $COMMENT_CMD "$NUM" --repo "${{ github.repository }}" --body "<!-- auto-continue -->
           @claude Continue where you left off. The previous run hit its turn limit. Check for any existing branches or commits you have already made. Complete the remaining work — commit, push, and ensure a PR exists."
 

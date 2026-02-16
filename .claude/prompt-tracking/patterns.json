@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "config": {
+    "detection_threshold": 3,
+    "escalation_threshold": 5,
+    "auto_implement_low_risk": false
+  },
+  "patterns": []
+}
