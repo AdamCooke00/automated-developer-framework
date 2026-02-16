@@ -44,7 +44,7 @@ This is a **GitHub Actions-based multi-agent automation framework** built entire
 | 1 | **Claude Code** | `claude.yml` | `@claude` mention in issues/PR comments/PR reviews; issue opened/assigned/labeled with `@claude` | Primary implementer — reads code, writes code, creates PRs |
 | 2 | **Claude Code Review** | `claude-review.yml` | PR opened / synchronize / reopened | Code reviewer — posts review via `gh pr review` |
 | 3 | **Auto Merge** | `auto-merge.yml` | `workflow_run` completed (after Claude Code Review) | Merges PRs labeled `auto-merge` |
-| 4 | **CI Doctor** | `ci-doctor.yml` | `workflow_run` completed with `failure` (after ANY of the other 9 workflows) | Diagnoses failures, posts comments |
+| 4 | **CI Doctor** | `ci-doctor.yml` | `workflow_run` completed with `failure` (watches 9 specifically listed workflows: Claude Code, Claude Review, Auto Merge, PR Size Guardian, Daily Digest, Agent Health Report, Stale Issue Gardener, Doc Drift Detector, Template Sync) | Diagnoses failures, posts comments |
 | 5 | **PR Size Guardian** | `pr-size-guardian.yml` | PR opened / synchronize | Warns if PR exceeds 400 lines changed |
 
 ### Scheduled Agents (Cron)
@@ -65,7 +65,7 @@ Labels serve as **state markers** and **routing signals** between agents.
 
 | Label | Set By | Read By | Purpose |
 |-------|--------|---------|---------|
-| `claude-working` | Claude Code (Apply working label step) | Humans | Indicates agent is actively processing an issue |
+| `claude-working` | Claude Code (Apply working label step) — only on `issues` and `issue_comment` events, NOT on PR review events | Humans | Indicates agent is actively processing an issue |
 | `planning` | Human (manually) | Claude Code (Detect planning mode step) | Switches agent to plan-only mode (Opus, 25 turns, no edit permissions) |
 | `auto-merge` | Claude Code (on PR creation via `gh pr create --label`) | Auto Merge workflow | PR is safe to merge without human review |
 | `needs-review` | Claude Code (on PR creation) | Humans | PR requires human review before merge |
@@ -80,10 +80,10 @@ Labels serve as **state markers** and **routing signals** between agents.
 ### Label State Transition Rules
 
 ```
-No labels → claude-working     (when Claude Code starts processing)
+No labels → claude-working     (when Claude Code starts processing on issue events)
 claude-working → (removed)      (when Claude Code finishes, success or failure)
 No labels → planning            (human adds manually to request plan-first)
-planning → (removed by human)   (human approves plan, removes label to trigger implementation)
+planning → (removed)            (automatically when workflow detects approval keywords like "approve", "implement", "proceed" in comment, OR manually by human)
 PR created → auto-merge         (Claude assesses risk as low)
 PR created → needs-review       (Claude assesses risk as moderate/high, or uncertain)
 PR created → blocked            (Claude cannot proceed without human input)
@@ -334,9 +334,14 @@ PR opened/synchronize ───────►  PR Size Guardian (pr-size-guardi
                                  Skips template_sync labeled PRs
 
 
-ANY workflow fails ───────────►  CI Doctor (ci-doctor.yml)
+9 specific workflows fail ────►  CI Doctor (ci-doctor.yml)
                                  10 turns | read-only
                                  Posts diagnostic comment
+                                 Watches: Claude Code, Claude Review,
+                                 Auto Merge, PR Size Guardian,
+                                 Daily Digest, Agent Health Report,
+                                 Stale Issue Gardener, Doc Drift Detector,
+                                 Template Sync
 
 
 Cron daily 8:00 UTC ──────────►  Daily Digest (daily-digest.yml)
@@ -463,13 +468,16 @@ Human adds "planning" label to issue
         └──► Claude reads codebase, posts plan as comment, stops
 
 Human reviews plan
-  ├──► Requests revisions → posts comment → Claude revises (still in planning mode)
-  └──► Approves plan → removes "planning" label → posts @claude
-        └──► claude.yml triggers in IMPLEMENTATION mode:
-              • Model: claude-sonnet-4-5-20250929
-              • Max turns: 50
-              • Full permissions: edit files, create branches, push, create PRs
-              • --dangerously-skip-permissions enabled
+  ├──► Requests revisions → posts comment with @claude → Claude revises (still in planning mode)
+  └──► Approves plan → posts comment with approval keywords ("approve", "implement", "proceed")
+        └──► "Detect plan approval and remove planning label" step automatically removes planning label
+              └──► Mode detection re-runs, detects NO planning label
+                    └──► claude.yml continues in IMPLEMENTATION mode:
+                          • Model: claude-sonnet-4-5-20250929
+                          • Max turns: 50
+                          • Full permissions: edit files, create branches, push, create PRs
+                          • --dangerously-skip-permissions enabled
+                          • Specific --allowedTools for gh commands alongside permissions skip
 ```
 
 ### Chain 4: Auto-Continue on Turn Exhaustion
@@ -479,12 +487,16 @@ Claude hits --max-turns during implementation
   └──► claude.yml "Auto-continue on turn exhaustion" step runs (always)
         └──► Checks execution output for "error_max_turns"
               └──► IF found:
-                    └──► Counts existing <!-- auto-continue --> markers
-                          ├──► IF count < 2: posts @claude continue comment
-                          │     └──► Re-triggers claude.yml
-                          │           └──► Claude resumes work (checks for existing branches/commits)
-                          └──► IF count >= 2: stops (prevents infinite loop)
-                                └──► ⚠ DEAD END: needs human intervention
+                    └──► Checks if work is already complete:
+                          ├──► Is issue already closed? → SKIP auto-continue (work done)
+                          ├──► Does an open PR already reference this issue? → SKIP auto-continue (work done)
+                          └──► Work NOT complete:
+                                └──► Counts existing <!-- auto-continue --> markers
+                                      ├──► IF count < 2: posts @claude continue comment
+                                      │     └──► Re-triggers claude.yml
+                                      │           └──► Claude resumes work (checks for existing branches/commits)
+                                      └──► IF count >= 2: stops (prevents infinite loop)
+                                            └──► ⚠ DEAD END: needs human intervention
 ```
 
 ### Chain 5: Review-Fix Cycle (Self-Healing)
@@ -616,11 +628,11 @@ These are the identified failure modes where the system can get stuck or behave 
 
 ### 2. Auto-Continue Turn Exhaustion
 
-**What happens:** The auto-continue mechanism retries up to 2 times via `<!-- auto-continue -->` markers. If work can't complete in 3 x max-turns (150 total turns), it stops silently.
+**What happens:** The auto-continue mechanism retries up to 2 times via `<!-- auto-continue -->` markers. If work can't complete in 3 x max-turns (150 total turns), it stops silently. The workflow includes completion checks (issue closed, open PR exists) to prevent unnecessary retries when work is already done.
 
-**Current behavior:** No notification that auto-continue has been exhausted. The issue may have a partially completed branch/PR.
+**Current behavior:** No notification that auto-continue has been exhausted. The issue may have a partially completed branch/PR. The completion checks prevent retrying when an issue is closed or a PR already exists.
 
-**Impact:** Medium — work is partially done but the human may not realize it's stalled.
+**Impact:** Medium — work is partially done but the human may not realize it's stalled. Mitigated by completion checks that skip auto-continue when work is detectably complete.
 
 **Potential improvement:** Post a "max retries exhausted" comment on the issue when the limit is hit.
 
@@ -714,7 +726,7 @@ This section defines the structure and conventions of this framework for anyone 
 
 | Agent | Model | Max Turns | Permissions | Special Flags |
 |-------|-------|-----------|-------------|---------------|
-| Claude Code (impl) | claude-sonnet-4-5-20250929 | 50 | Full write | `--dangerously-skip-permissions` |
+| Claude Code (impl) | claude-sonnet-4-5-20250929 | 50 | Full write | `--dangerously-skip-permissions` + specific `--allowedTools` for gh commands |
 | Claude Code (plan) | claude-opus-4-6 | 25 | Read-only | Planning system prompt |
 | Claude Review | (default) | 5 | Read + PR write | `--dangerously-skip-permissions` |
 | CI Doctor | (default) | 10 | Read + PR write | Specific `--allowed-tools` |
@@ -737,7 +749,7 @@ Claude Code (`claude.yml`) uses `--append-system-prompt` to inject mode-specific
 |--------|---------|---------|
 | `CLAUDE_CODE_OAUTH_TOKEN` | Max subscription auth (free tier) | All Claude-powered workflows |
 | `ANTHROPIC_API_KEY` | API key fallback (paid) | All Claude-powered workflows |
-| `PAT_TOKEN` | GitHub PAT for cross-workflow triggers and write operations | claude.yml, ci-doctor.yml, claude-review.yml, auto-merge.yml, doc-drift-detector.yml, template-sync.yml, stale-issue-gardener.yml |
+| `PAT_TOKEN` | GitHub PAT for cross-workflow triggers and write operations | claude.yml, claude-review.yml, auto-merge.yml, doc-drift-detector.yml, template-sync.yml, stale-issue-gardener.yml |
 
 ### File Structure
 
