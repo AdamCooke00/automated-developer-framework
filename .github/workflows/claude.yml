@@ -38,10 +38,10 @@ jobs:
         if: |
           github.event_name == 'issue_comment' &&
           (
-            contains(toLower(github.event.comment.body), 'approve') ||
-            contains(toLower(github.event.comment.body), 'implement') ||
-            contains(toLower(github.event.comment.body), 'let''s proceed') ||
-            startsWith(toLower(github.event.comment.body), 'proceed')
+            contains(github.event.comment.body, 'approve') || contains(github.event.comment.body, 'Approve') || contains(github.event.comment.body, 'APPROVE') ||
+            contains(github.event.comment.body, 'implement') || contains(github.event.comment.body, 'Implement') || contains(github.event.comment.body, 'IMPLEMENT') ||
+            contains(github.event.comment.body, 'let''s proceed') || contains(github.event.comment.body, 'Let''s proceed') ||
+            contains(github.event.comment.body, 'proceed') || contains(github.event.comment.body, 'Proceed') || contains(github.event.comment.body, 'PROCEED')
           )
         run: |
           set -e
