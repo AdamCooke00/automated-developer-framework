@@ -62,20 +62,17 @@ jobs:
           github.event_name == 'issue_comment' &&
           steps.mode.outputs.planning == 'true' &&
           (
-            contains(github.event.comment.body, 'approve') ||
-            contains(github.event.comment.body, 'implement') ||
-            contains(github.event.comment.body, 'proceed')
+            contains(toLower(github.event.comment.body), 'approve') ||
+            contains(toLower(github.event.comment.body), 'implement') ||
+            contains(toLower(github.event.comment.body), 'let''s proceed') ||
+            startsWith(toLower(github.event.comment.body), 'proceed')
           )
         run: |
+          set -e
           ISSUE_NUM="${{ github.event.issue.number }}"
           echo "Plan approval detected — removing planning label to switch to implementation mode"
-          if gh issue edit "$ISSUE_NUM" --remove-label planning; then
-            echo "Planning label removed successfully"
-            # Update the mode output to switch to implementation for this run
-            echo "planning=false" >> $GITHUB_OUTPUT
-          else
-            echo "Warning: Failed to remove planning label from issue #$ISSUE_NUM"
-          fi
+          gh issue edit "$ISSUE_NUM" --remove-label planning
+          echo "Planning label removed successfully"
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
 
@@ -214,19 +211,15 @@ jobs:
           steps.mode.outputs.planning != 'true' &&
           (github.event_name == 'issues' || github.event_name == 'issue_comment')
         run: |
-          ISSUE_NUM=""
-          if [ "${{ github.event_name }}" = "issues" ]; then
-            ISSUE_NUM="${{ github.event.issue.number }}"
-          elif [ "${{ github.event_name }}" = "issue_comment" ]; then
-            ISSUE_NUM="${{ github.event.issue.number }}"
-          fi
+          ISSUE_NUM="${{ github.event.issue.number }}"
           if [ -n "$ISSUE_NUM" ]; then
             # Only remove if it exists
             if gh issue view "$ISSUE_NUM" --json labels --jq '[.labels[].name] | join(",")' | grep -q "planning"; then
               if gh issue edit "$ISSUE_NUM" --remove-label planning; then
                 echo "Planning label removed after implementation completed"
               else
-                echo "Warning: Failed to remove planning label from issue #$ISSUE_NUM"
+                echo "Error: Failed to remove planning label from issue #$ISSUE_NUM" >&2
+                exit 1
               fi
             else
               echo "No planning label to remove"
