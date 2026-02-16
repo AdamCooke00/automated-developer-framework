@@ -309,6 +309,7 @@ jobs:
         continue-on-error: true
         uses: anthropics/claude-code-action@v1
         with:
+          prompt: "Implement the approved plan for issue #${{ github.event.issue.number }} in repository ${{ github.repository }}."
           allowed_bots: "claude"
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: >-
@@ -322,6 +323,7 @@ jobs:
         if: steps.mode.outputs.agent == 'implement' && (env.HAS_MAX_TOKEN != 'true' || steps.implement_max.outcome != 'success')
         uses: anthropics/claude-code-action@v1
         with:
+          prompt: "Implement the approved plan for issue #${{ github.event.issue.number }} in repository ${{ github.repository }}."
           allowed_bots: "claude"
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_args: >-
