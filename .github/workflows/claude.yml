@@ -33,6 +33,47 @@ jobs:
           fetch-depth: 1
           token: ${{ secrets.PAT_TOKEN }}
 
+      # Detect plan approval and remove planning label (must happen BEFORE mode detection)
+      - name: Detect plan approval and remove planning label
+        if: |
+          github.event_name == 'issue_comment' &&
+          (
+            contains(toLower(github.event.comment.body), 'approve') ||
+            contains(toLower(github.event.comment.body), 'implement') ||
+            contains(toLower(github.event.comment.body), 'let''s proceed') ||
+            startsWith(toLower(github.event.comment.body), 'proceed')
+          )
+        run: |
+          set -e
+          ISSUE_NUM="${{ github.event.issue.number }}"
+
+          # Check if issue has planning label before proceeding
+          LABELS=$(gh issue view "$ISSUE_NUM" --repo "$GITHUB_REPOSITORY" --json labels --jq '[.labels[].name] | join(",")' 2>/dev/null || echo "")
+          if ! echo "$LABELS" | grep -q "planning"; then
+            echo "No planning label found - skipping approval detection"
+            exit 0
+          fi
+
+          # Validate that approval is from issue author or assignee
+          COMMENT_AUTHOR="${{ github.event.comment.user.login }}"
+          ISSUE_AUTHOR=$(gh issue view "$ISSUE_NUM" --repo "$GITHUB_REPOSITORY" --json author --jq '.author.login' 2>/dev/null || echo "")
+          ASSIGNEES=$(gh issue view "$ISSUE_NUM" --repo "$GITHUB_REPOSITORY" --json assignees --jq '[.assignees[].login] | join(",")' 2>/dev/null || echo "")
+
+          if [ "$COMMENT_AUTHOR" != "$ISSUE_AUTHOR" ] && ! echo "$ASSIGNEES" | grep -q "$COMMENT_AUTHOR"; then
+            echo "Approval comment not from issue author or assignee - ignoring"
+            exit 0
+          fi
+
+          echo "Plan approval detected from authorized user — removing planning label to switch to implementation mode"
+          if gh issue view "$ISSUE_NUM" --json labels --jq '[.labels[].name] | join(",")' | grep -q "planning"; then
+            gh issue edit "$ISSUE_NUM" --remove-label planning
+            echo "Planning label removed successfully"
+          else
+            echo "Planning label already removed"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+
       # Detect if the issue has a "planning" label (plan-first workflow)
       - name: Detect planning mode
         id: mode
@@ -179,6 +220,35 @@ jobs:
           if [ -n "$ISSUE_NUM" ]; then
             if ! gh issue edit "$ISSUE_NUM" --remove-label claude-working; then
               echo "Warning: Failed to remove claude-working label from issue #$ISSUE_NUM"
+            fi
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+
+      # Remove planning label after implementation completes
+      - name: Remove planning label after implementation
+        if: |
+          success() &&
+          steps.mode.outputs.planning != 'true' &&
+          (github.event_name == 'issues' || github.event_name == 'issue_comment')
+        run: |
+          ISSUE_NUM=""
+          if [ "${{ github.event_name }}" = "issues" ]; then
+            ISSUE_NUM="${{ github.event.issue.number }}"
+          elif [ "${{ github.event_name }}" = "issue_comment" ]; then
+            ISSUE_NUM="${{ github.event.issue.number }}"
+          fi
+          if [ -n "$ISSUE_NUM" ]; then
+            # Only remove if it exists
+            if gh issue view "$ISSUE_NUM" --json labels --jq '[.labels[].name] | join(",")' | grep -q "planning"; then
+              if gh issue edit "$ISSUE_NUM" --remove-label planning; then
+                echo "Planning label removed after implementation completed"
+              else
+                echo "Error: Failed to remove planning label from issue #$ISSUE_NUM" >&2
+                exit 1
+              fi
+            else
+              echo "No planning label to remove"
             fi
           fi
         env:
