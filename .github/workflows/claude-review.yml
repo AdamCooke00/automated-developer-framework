@@ -76,8 +76,9 @@ jobs:
       - name: Request fixes for review findings
         if: always()
         env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
         run: |
           # Count existing review-fix-cycle markers to prevent infinite loops
           MARKER_COUNT=$(gh pr view "$PR_NUMBER" --json comments --jq '[.comments[].body | select(contains("<!-- review-fix-cycle -->"))] | length')
@@ -89,7 +90,7 @@ jobs:
           fi
 
           # Fetch the most recent review body
-          REVIEW_BODY=$(gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews" \
+          REVIEW_BODY=$(gh api "repos/$REPO/pulls/$PR_NUMBER/reviews" \
             --jq '[.[] | select(.state == "COMMENTED")] | sort_by(.submitted_at) | last | .body')
 
           if [ -z "$REVIEW_BODY" ]; then
@@ -102,7 +103,7 @@ jobs:
           if echo "$FIRST_LINE" | grep -iq "## Issues Found"; then
             echo "Review found issues. Posting fix request comment..."
             gh pr comment "$PR_NUMBER" --body "<!-- review-fix-cycle -->
-          @claude The automated code review found issues that need fixing. Read the review comments above, fix the identified bugs and issues, commit, and push."
+@claude The automated code review found issues that need fixing. Read the review comments above, fix the identified bugs and issues, commit, and push."
             echo "Fix request posted successfully."
           else
             echo "No issues found in review. Skipping auto-fix request."
