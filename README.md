@@ -2,19 +2,32 @@
 
 A GitHub template repository pre-configured with Claude Code automation. Clone it, configure it, and every future project inherits AI-powered issue handling and code review.
 
+## How It Works
+
+This template implements a multi-agent automation framework using GitHub Actions and Claude Code. The system includes 10 workflows (agents) that handle implementation, code review, CI diagnosis, scheduled maintenance, and more. Agents communicate through labels, comments, and workflow chaining to create a self-healing development loop.
+
+**For the complete technical specification** — including all workflow triggers, state machines, handoff chains, authentication flow, edge cases, and file structure — see **[docs/flow-diagram.md](docs/flow-diagram.md)**.
+
 ## What You Get
 
-- **`@claude` on issues and PRs** — mention `@claude` in any issue or PR comment, and Claude reads the repo, implements the request, and pushes commits or opens a PR
-- **Automatic code review** — every PR is reviewed by Claude when opened or updated, with inline comments and a summary
-- **PR size guardian** — automatically warns when PRs exceed 400 lines and suggests how to split them into smaller, reviewable chunks
-- **CI Doctor** — when any CI workflow fails, Claude automatically diagnoses the failure and posts a comment on the PR with what failed, why, and suggested fixes
-- **Daily digest** — every morning, Claude creates a summary issue with what was completed, what needs your review (with risk assessment), and what's blocked. One push notification per project on your phone.
-- **Agent health report** — every Friday at 9am UTC, Claude creates a weekly report on its own activity and effectiveness: PRs created/merged, merge rate, risk label distribution, failed workflow runs, and actionable recommendations
-- **Stale issue gardener** — every Monday, Claude reviews open issues, marks those inactive for 30+ days as stale, closes those inactive for 60+ days, and labels recently opened issues with no labels
-- **Doc Drift Detector** — every Monday, Claude compares documentation (README.md, CLAUDE.md) against actual code structure, and opens a PR to fix outdated file paths, commands, or directory references
-- **PR risk labeling** — Claude labels every PR it creates as `auto-merge`, `needs-review`, or `blocked` so you can triage across multiple projects
-- **Template sync** — when this template is updated, downstream repos automatically receive a PR with the changes
-- **Max-first auth** — uses your Max subscription first (already paid for), falls back to API key only when needed
+**Reactive workflows:**
+- **`@claude` on issues and PRs** — implements requests and creates PRs
+- **Automatic code review** — reviews every PR when opened or updated
+- **PR size guardian** — warns when PRs exceed 400 lines
+- **CI Doctor** — diagnoses failures and posts fix suggestions
+
+**Scheduled maintenance:**
+- **Daily digest** — morning summary of completed work, PRs needing review (with risk assessment), and blockers
+- **Agent health report** — weekly Friday report on Claude's effectiveness and recommendations
+- **Stale issue gardener** — weekly Monday cleanup of inactive issues
+- **Doc Drift Detector** — weekly Monday check for outdated documentation
+
+**Infrastructure:**
+- **PR risk labeling** — auto-merge, needs-review, or blocked labels for triage
+- **Template sync** — automatic PRs when the template updates
+- **Max-first auth** — free tier first, API fallback
+
+For detailed workflow specifications, state machines, and handoff chains, see [docs/flow-diagram.md](docs/flow-diagram.md).
 
 ## How You Work With Claude
 
@@ -131,56 +144,22 @@ git push origin main
 
 ## How Auth Works
 
-The workflows use a **Max-first, API-fallback** pattern:
-
-```
-Request comes in (@claude mention or PR opened)
-  │
-  ├─ CLAUDE_CODE_OAUTH_TOKEN is set?
-  │   ├─ Yes → Try Max subscription
-  │   │        ├─ Success → Done (no API cost)
-  │   │        ├─ Hit turn limit → Done (work was completed, no fallback)
-  │   │        └─ Auth failed (rate-limited/expired) → Fall back to API key
-  │   └─ No → Skip straight to API key
-  │
-  └─ ANTHROPIC_API_KEY handles the request (pay-per-token)
-```
-
-**Double-charge protection:** If the Max step completes work but hits the turn limit, the fallback is automatically skipped. This prevents paying for the same work twice. The fallback only triggers on genuine auth failures.
-
-**Why this order:** Your Max subscription is already paid for. Using it first means automation runs at no additional cost until you hit the 5-hour rolling usage limit. The API key catches overflow.
+The workflows use a **Max-first, API-fallback** pattern: your Max subscription (already paid for) runs first at no additional cost, with automatic fallback to API key only on auth failures. Double-charge protection prevents paying twice when Max completes work but hits the turn limit.
 
 **Configuration options:**
 - **Both secrets set (recommended):** Max handles most runs for free; API key covers rate-limited periods
-- **Only `CLAUDE_CODE_OAUTH_TOKEN`:** Free automation, but workflows fail if Max is rate-limited or token expires
+- **Only `CLAUDE_CODE_OAUTH_TOKEN`:** Free automation, but workflows fail if Max is rate-limited
 - **Only `ANTHROPIC_API_KEY`:** Every run costs money, but no rate-limit interruptions
 
-**OAuth token refresh:** Tokens from `claude setup-token` can expire. If you notice the Max step consistently failing, re-run `claude setup-token` and update the secret. The `/install-github-app` flow handles refresh more reliably.
+For the complete authentication flow diagram and technical details, see [docs/flow-diagram.md](docs/flow-diagram.md#authentication-flow).
 
 ## Daily Digest & Auto-Merge
 
-### Daily digest
+The daily digest runs every morning at 8am UTC, creating a GitHub issue with: completed work, PRs needing review (with risk assessment), blockers, and upcoming tasks. Install the [GitHub mobile app](https://github.com/mobile) for push notifications.
 
-The `daily-digest.yml` workflow runs every morning at 8am UTC. It reviews the last 24 hours of activity and creates a GitHub issue labeled `daily-digest` with:
+Auto-merge automatically merges PRs labeled `auto-merge` after review passes. PRs labeled `needs-review` or `blocked` wait for human approval. No configuration needed.
 
-- **Completed** — PRs merged and issues closed
-- **Needs Review** — open PRs with risk assessment (critical / normal / low risk)
-- **Blocked** — anything that failed or needs your input
-- **Upcoming** — open issues assigned to Claude
-
-If there was no activity, no issue is created.
-
-**Mobile workflow:** Install the [GitHub mobile app](https://github.com/mobile). The digest issue creates a push notification. Open it, scan the summary, and tap into any PRs that need you.
-
-**Change the schedule:** Edit the cron in `daily-digest.yml`. Use [crontab.guru](https://crontab.guru) to set your preferred time.
-
-### Auto-merge setup
-
-Claude labels every PR it creates with a risk level (`auto-merge`, `needs-review`, or `blocked`). The `auto-merge.yml` workflow automatically merges PRs labeled `auto-merge` after the Claude Code Review passes. No branch protection rules or GitHub Pro required.
-
-This works out of the box — no configuration needed. PRs labeled `needs-review` or `blocked` are never auto-merged and wait for you.
-
-**To disable auto-merge:** Delete `.github/workflows/auto-merge.yml`.
+For technical details on label behavior, workflow chaining, and state transitions, see [docs/flow-diagram.md](docs/flow-diagram.md#agentic-handoff-chains).
 
 ## Cost Control
 
@@ -229,7 +208,7 @@ If anything fails, check the **Actions** tab in your repo for workflow run logs.
 GitHub templates are a one-time copy — your project doesn't automatically get updates when the template improves. The `template-sync.yml` workflow solves this.
 
 **How it works:**
-- Runs on the 1st of every month (and on manual trigger)
+- Runs every Monday at midnight UTC (and on manual trigger)
 - Compares your repo against the template
 - Opens a PR with any new changes, labeled `template_sync`
 - You review and merge (or close) the PR
@@ -297,22 +276,7 @@ These can all be added later as separate workflow files.
 
 ## File Overview
 
-```
-.github/workflows/
-  claude.yml                Reactive workflow — responds to @claude mentions
-  claude-review.yml         Auto-review — reviews every PR on open/push
-  pr-size-guardian.yml      Warns when PRs exceed 400 lines, suggests how to split
-  ci-doctor.yml             CI failure diagnosis — automatic diagnostic comments on failed workflows
-  daily-digest.yml          Daily summary of activity and PRs needing review
-  agent-health-report.yml   Weekly health report — tracks Claude's PRs, merge rate, risk labels, workflow failures
-  stale-issue-gardener.yml  Weekly issue maintenance — marks stale, closes abandoned, labels new issues
-  doc-drift-detector.yml    Weekly doc drift detection — compares docs against code, opens PR with fixes
-  template-sync.yml         Monthly sync from template repo (opens PRs with updates)
-CLAUDE.md                   Project memory — fill this in for your project
-.templatesyncignore         Files excluded from template sync (project-specific files)
-.gitignore                  Language-agnostic defaults
-README.md                   This file
-```
+The repository contains 10 workflow files in `.github/workflows/` (reactive and scheduled agents), `CLAUDE.md` (project instructions for Claude), and configuration files. For the complete file structure with descriptions, see [docs/flow-diagram.md](docs/flow-diagram.md#file-structure).
 
 ## Resources
 
