@@ -80,6 +80,15 @@ Example:
 - If you cannot fully resolve an issue, leave it open and comment explaining what's blocked.
 - After pushing code changes, always create a PR using `gh pr create` with a title, body, and "Closes #N" in the body. Do not skip this step.
 
+## Multi-Agent Workflow (do not remove)
+
+This project uses a three-agent workflow for quality gates:
+1. **Plan Agent** (Opus, 50 turns) - Creates detailed implementation plans
+2. **Review Agent** (Opus, 50 turns) - Critiques plans before implementation
+3. **Implementation Agent** (Sonnet, 50 turns) - Executes approved plans
+
+Label-based state transitions control the workflow. See [docs/label-schema.md](docs/label-schema.md) for complete details on labels, state transitions, and agent permissions. Agents manage labels directly - the UI and humans should not modify workflow labels (`planning`, `plan-review`, `ready-to-implement`, `needs-human-input`).
+
 ## Output Style (do not remove)
 
 - Be thorough in analysis but concise in output. Prefer bullet points over paragraphs.
