@@ -39,3 +39,6 @@ htmlcov/
 
 # Claude Code local settings (user-specific, not shared)
 .claude/settings.local.json
+
+# Pattern tracking logs (per-developer, not shared)
+.claude/prompt-tracking/prompt-log.jsonl

@@ -87,6 +87,7 @@ Example:
 - PR descriptions: state what changed and why in 2-3 sentences, then a bullet list of files changed.
 - Code review comments: one sentence per issue, include the fix. Skip praise.
 - Minimize tool calls: batch file reads, avoid reading files you don't need, prefer glob over individual reads.
+- Never fabricate technical constraints or permission errors. If you cannot do something due to your current mode or instructions, state the actual reason directly.
 
 ## PR Risk Labeling (do not remove)
 
