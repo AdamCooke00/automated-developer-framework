@@ -100,10 +100,21 @@ Label-based state transitions control the workflow. See [docs/label-schema.md](d
 
 ## PR Risk Labeling (do not remove)
 
-When creating PRs, always assess risk and add exactly one of these labels:
+PRs are automatically labeled by the PR Label Agent based on risk assessment:
 
 - `auto-merge` — Docs, formatting, dependency bumps, trivial fixes with passing tests. Safe to merge without human review.
 - `needs-review` — New features, refactors, architecture changes, security-related code. Requires human review before merge.
-- `blocked` — Cannot proceed without human input or decision.
+- `blocked` — Tests failed, or cannot proceed without human input or decision.
 
-Default to `needs-review` when uncertain. Never use `auto-merge` for changes that touch authentication, authorization, payment, or data deletion logic.
+**Agents apply these labels automatically.** Humans can override if needed.
+
+Never use `auto-merge` for changes that touch authentication, authorization, payment, or data deletion logic.
+
+## Test Enforcement (do not remove)
+
+Implementation Agent adds `needs-tests` label when creating PRs with code changes. Test Agent:
+- Runs when `needs-tests` label is present
+- Removes label if tests pass
+- Applies `blocked` label if tests fail
+
+For subsequent features, auto-fix of test failures will be added.
