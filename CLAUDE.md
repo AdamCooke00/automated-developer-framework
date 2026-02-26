@@ -82,12 +82,13 @@ Example:
 
 ## Multi-Agent Workflow (do not remove)
 
-This project uses a three-agent workflow for quality gates:
-1. **Plan Agent** (Opus, 50 turns) - Creates detailed implementation plans
-2. **Review Agent** (Opus, 50 turns) - Critiques plans before implementation
-3. **Implementation Agent** (Sonnet, 50 turns) - Executes approved plans
+This project uses a four-agent workflow for quality gates:
+1. **Spec Agent** (Sonnet, 15 turns) - Evaluates issue clarity before planning; blocks vague issues
+2. **Plan Agent** (Opus, 50 turns) - Creates detailed implementation plans
+3. **Review Agent** (Opus, 50 turns) - Critiques plans before implementation
+4. **Implementation Agent** (Sonnet, 50 turns) - Executes approved plans
 
-Label-based state transitions control the workflow. See [docs/label-schema.md](docs/label-schema.md) for complete details on labels, state transitions, and agent permissions. Agents manage labels directly - the UI and humans should not modify workflow labels (`planning`, `plan-review`, `ready-to-implement`, `needs-human-input`).
+Label-based state transitions control the workflow. See [docs/label-schema.md](docs/label-schema.md) for complete details on labels, state transitions, and agent permissions. Agents manage labels directly - the UI and humans should not modify workflow labels (`spec-check`, `needs-clarification`, `planning`, `plan-review`, `ready-to-implement`, `needs-human-input`).
 
 ## Output Style (do not remove)
 

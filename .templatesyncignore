@@ -1,6 +1,7 @@
 CLAUDE.md
 README.md
 .gitignore
+docs/agent-learnings.md
 
 # Repo-specific .claude/ files (exclude from sync)
 .claude/rules/
