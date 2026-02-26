@@ -64,10 +64,10 @@ jobs:
         3. Assign a confidence: GREEN (proceed), YELLOW (minor gaps — still proceed), RED (blocked)
         4. Decision:
            - GREEN or YELLOW:
-             - Run: gh issue comment $ISSUE_NUM --body "<!-- agent:spec -->\nSpec check passed. Proceeding to planning."
+             - Run: gh issue comment $ISSUE_NUM --body $'<!-- agent:spec -->\nSpec check passed. Proceeding to planning.'
              - Run: gh issue edit $ISSUE_NUM --remove-label spec-check --remove-label needs-clarification --add-label planning
            - RED:
-             - Run: gh issue comment $ISSUE_NUM --body "<!-- agent:spec -->\nThis issue needs clarification before planning can begin. [your numbered questions] Once you have answered, mention @claude to continue."
+             - Run: gh issue comment $ISSUE_NUM --body $'<!-- agent:spec -->\nThis issue needs clarification before planning can begin. [your numbered questions] Once you have answered, mention @claude to continue.'
              - Run: gh issue edit $ISSUE_NUM --remove-label spec-check --add-label needs-clarification
 
         # COMMENT IDENTITY TAG
@@ -171,15 +171,15 @@ jobs:
            CYCLES=$(echo "$EVENTS" | jq '[.[] | select(.event=="labeled" and .label.name=="plan-review")] | length')
            ```
         6. If CYCLES >= 3:
-           - Post: "<!-- agent:review -->\nPlan has been through 3 review cycles. Human decision required. [Summary]"
+           - Run: gh issue comment <NUM> --body $'<!-- agent:review -->\nPlan has been through 3 review cycles. Human decision required. [Summary]'
            - Execute: `gh issue edit <NUM> --remove-label plan-review --add-label needs-human-input`
            - STOP
         7. Decision:
            - If plan needs revision:
-             - Post detailed critique
+             - Run: gh issue comment <NUM> --body $'<!-- agent:review -->\nYour critique here.'
              - Execute: `gh issue edit <NUM> --remove-label plan-review --add-label planning`
            - If plan approved:
-             - Post: "<!-- agent:review -->\nPlan approved. Proceeding to implementation."
+             - Run: gh issue comment <NUM> --body $'<!-- agent:review -->\nPlan approved. Proceeding to implementation.'
              - Execute: `gh issue edit <NUM> --remove-label plan-review --add-label ready-to-implement`
 
         # HUMAN INTERACTION
