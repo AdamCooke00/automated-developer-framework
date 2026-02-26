@@ -320,6 +320,17 @@ jobs:
           fi
           LABELS=$(gh issue view "$ISSUE_NUM" --repo "$GITHUB_REPOSITORY" --json labels --jq '[.labels[].name] | join(",")' 2>/dev/null || echo "")
 
+          # Check for PR Fix Mode (review-fix-cycle comment on PR with needs-review label)
+          IS_REVIEW_FIX="${{ contains(github.event.comment.body, '<!-- review-fix-cycle -->') }}"
+          if [ "${{ github.event_name }}" = "issue_comment" ] && [ "$IS_REVIEW_FIX" = "true" ]; then
+            # Check if PR has needs-review label
+            if echo "$LABELS" | grep -q "needs-review"; then
+              echo "agent=fix" >> $GITHUB_OUTPUT
+              echo "Agent mode: fix (review-fix-cycle comment on PR with needs-review label)"
+              exit 0
+            fi
+          fi
+
           # Check labels in priority order
           if echo "$LABELS" | grep -q "ready-to-implement"; then
             echo "agent=implement" >> $GITHUB_OUTPUT
@@ -506,6 +517,41 @@ jobs:
             --dangerously-skip-permissions
             --allowedTools "Read,Glob,Grep,Bash(gh *),Bash(git *),Bash(cat *)"
             --append-system-prompt "CRITICAL WORKFLOW: You are running in CI with a turn limit. Follow this exact order: 0) Read project learnings to avoid known pitfalls: use the Read tool on 'docs/agent-learnings.md' if it exists. 1) Read the approved plan from issue #${{ github.event.issue.number }} using 'gh issue view' to extract comments containing the implementation plan. 2) Create a working branch and push it immediately. 3) Implement the plan, committing and pushing after EVERY meaningful change — do NOT batch commits until the end. 4) Create a PR using 'gh pr create' with the plan included in the body under '## Implementation Plan' section. Include 'Closes #${{ github.event.issue.number }}' in the body. 5) After PR creation, check if code changes include logic files (not just docs/tests): if so, add needs-tests label using 'gh pr edit PR_NUM --add-label needs-tests'. 6) NEVER use risk labels (auto-merge/needs-review/blocked) — the PR Label Agent will apply those. 7) NEVER stop without having committed, pushed, and created the PR. 8) If you sense low turns remaining, immediately commit, push, and ensure the PR exists."
+
+      # Fix Agent: Apply fixes from code review (Sonnet, 50 turns)
+      - name: Run Fix Agent
+        id: fix_max
+        if: steps.mode.outputs.agent == 'fix' && env.HAS_MAX_TOKEN == 'true'
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          display_report: "false"
+          prompt: "Apply the fixes identified in code review for PR #${{ github.event.issue.number }}."
+          allowed_bots: "claude"
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.PAT_TOKEN }}
+          claude_args: >-
+            --model claude-sonnet-4-5-20250929
+            --max-turns 50
+            --dangerously-skip-permissions
+            --allowedTools "Read,Glob,Grep,Bash(gh *),Bash(git *),Bash(cat *)"
+            --append-system-prompt "You are the Fix Agent. Your role is to apply fixes identified in code review to an existing PR branch. Follow this process: 1) Read project learnings from 'docs/agent-learnings.md' if it exists to avoid known pitfalls. 2) Checkout the PR branch: gh pr checkout ${{ github.event.issue.number }}. 3) Read the PR description using 'gh pr view ${{ github.event.issue.number }}' to understand the original implementation plan context. 4) Read the latest code review comments to identify the specific issues that need fixing. The review comment will be immediately before the auto-fix trigger comment. 5) Apply each fix identified in the review systematically. 6) Commit your changes with a descriptive commit message explaining what was fixed. 7) Push the changes to the PR branch: git push. 8) Do NOT create a new PR or new branch — you are fixing an existing PR. 9) Do NOT modify code unrelated to the review feedback — fix only what was identified as problematic. The code review workflow will automatically re-run after your push and re-evaluate the PR."
+
+      - name: Run Fix Agent (Fallback)
+        if: steps.mode.outputs.agent == 'fix' && (env.HAS_MAX_TOKEN != 'true' || steps.fix_max.outcome != 'success')
+        uses: anthropics/claude-code-action@v1
+        with:
+          display_report: "false"
+          prompt: "Apply the fixes identified in code review for PR #${{ github.event.issue.number }}."
+          allowed_bots: "claude"
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.PAT_TOKEN }}
+          claude_args: >-
+            --model claude-sonnet-4-5-20250929
+            --max-turns 50
+            --dangerously-skip-permissions
+            --allowedTools "Read,Glob,Grep,Bash(gh *),Bash(git *),Bash(cat *)"
+            --append-system-prompt "You are the Fix Agent. Your role is to apply fixes identified in code review to an existing PR branch. Follow this process: 1) Read project learnings from 'docs/agent-learnings.md' if it exists to avoid known pitfalls. 2) Checkout the PR branch: gh pr checkout ${{ github.event.issue.number }}. 3) Read the PR description using 'gh pr view ${{ github.event.issue.number }}' to understand the original implementation plan context. 4) Read the latest code review comments to identify the specific issues that need fixing. The review comment will be immediately before the auto-fix trigger comment. 5) Apply each fix identified in the review systematically. 6) Commit your changes with a descriptive commit message explaining what was fixed. 7) Push the changes to the PR branch: git push. 8) Do NOT create a new PR or new branch — you are fixing an existing PR. 9) Do NOT modify code unrelated to the review feedback — fix only what was identified as problematic. The code review workflow will automatically re-run after your push and re-evaluate the PR."
 
       # Auto-continue: if Claude hit the turn limit AND work is incomplete, post a continuation comment
       - name: Auto-continue on turn exhaustion
